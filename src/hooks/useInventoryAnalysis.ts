@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { readLabelsFromImage } from "../services/geminiOCR";
 import { detectProducts, flattenDINOResults, cropBoxRegion } from "../services/groundingDinoAPI";
-import type { FlatPrediction } from "../services/groundingDinoAPI";
+import type { FlatPrediction, DINOResponse } from "../services/groundingDinoAPI";
 import { analyzeMultiAngle, analyzeSinglePhoto } from "../services/geminiMultiAngle";
 import { matchCatalog, getCatalog } from "../services/productCatalog";
 import { mergeMultiAngle, mergeSinglePhoto } from "../services/mergeResults";
@@ -123,25 +123,25 @@ export function useInventoryAnalysis() {
       // ═══════════════════════════════════════════════════════════
       console.log("[COUNTR] Step 1: Grounding DINO on %d frames + OCR...", photos.length);
 
-      const dinoPromises = photos.map((photo, i) =>
-        detectProducts(photo).then(
-          (res) => { console.log("[COUNTR] DINO frame %d: %d predictions", i, res.predictions.length); return res; },
-          (err) => { console.error("[COUNTR] DINO frame %d FAILED:", i, err); return null; },
-        ),
-      );
+      // Stagger DINO requests 250ms apart to avoid API rate limiting
+      const dinoStarted: Promise<DINOResponse | null>[] = [];
+      for (let i = 0; i < photos.length; i++) {
+        if (i > 0) await new Promise((r) => setTimeout(r, 250));
+        dinoStarted.push(
+          detectProducts(photos[i]).then(
+            (res) => { console.log("[COUNTR] DINO frame %d: %d predictions", i, res.predictions.length); return res; },
+            (err) => { console.error("[COUNTR] DINO frame %d FAILED:", i, err); return null; },
+          ),
+        );
+      }
 
-      const settled = await Promise.allSettled([
-        Promise.all(dinoPromises),
-        readLabelsFromImage(photos[0]),
+      // OCR runs in parallel with the DINO calls
+      const [dinoResults, ocrSettled] = await Promise.all([
+        Promise.all(dinoStarted),
+        readLabelsFromImage(photos[0]).catch(() => [] as string[]),
       ]);
 
-      const dinoResults = settled[0].status === "fulfilled" ? settled[0].value : photos.map(() => null);
-      const dinoResult = dinoResults[0]; // frame 0 for main pipeline
-
-      const ocrTexts = settled[1].status === "fulfilled" ? settled[1].value : [] as string[];
-      if (settled[1].status === "rejected") {
-        console.error("[COUNTR] OCR FAILED:", settled[1].reason);
-      }
+      const ocrTexts = ocrSettled;
 
       // Flatten DINO results for each frame
       const perFrameFlat: FlatPrediction[][] = dinoResults.map((dr) =>
@@ -230,17 +230,16 @@ export function useInventoryAnalysis() {
       // ═══════════════════════════════════════════════════════════
       // Build per-frame angle annotations
       // ═══════════════════════════════════════════════════════════
-      const geminiFallbackPreds = geminiProducts.length > 0
-        ? geminiBboxToPredictions(geminiProducts, imgDims.width, imgDims.height)
-        : [];
-
       const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => {
         let framePreds = flatToMerged(perFrameFlat[i]);
 
-        // Fallback: if DINO found nothing for this frame, use Gemini boxes (frame 0 only)
-        if (framePreds.length === 0 && i === 0 && geminiFallbackPreds.length > 0) {
-          console.log("[COUNTR] Frame %d: using Gemini bbox fallback (%d boxes)", i, geminiFallbackPreds.length);
-          framePreds = geminiFallbackPreds;
+        // Fallback: if DINO found nothing for this frame, use Gemini boxes
+        if (framePreds.length === 0 && geminiProducts.length > 0) {
+          const fallback = geminiBboxToPredictions(geminiProducts, allDims[i].width, allDims[i].height);
+          if (fallback.length > 0) {
+            console.log("[COUNTR] Frame %d: DINO empty, using Gemini bbox fallback (%d boxes)", i, fallback.length);
+            framePreds = fallback;
+          }
         }
 
         return {
