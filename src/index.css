@@ -550,15 +550,6 @@ body {
   gap: var(--space-md);
 }
 
-/* When recording, make the whole component fullscreen */
-.vc-is-fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: #000;
-  gap: 0;
-}
-
 .vc-viewfinder {
   position: relative;
   border-radius: var(--radius-md);
@@ -588,20 +579,7 @@ body {
   font-size: 14px;
 }
 
-/* ── Fullscreen recording view ─────────────────────────────── */
-.vc-fullscreen {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.vc-fullscreen-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
+/* ── Recording overlay (inside viewfinder) ─────────────────── */
 .vc-fs-top {
   position: absolute;
   top: 0;
@@ -610,8 +588,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px 8px;
+  padding: 10px 12px 6px;
   z-index: 10;
+  pointer-events: none;
 }
 
 .vc-rec-badge {
@@ -619,10 +598,10 @@ body {
   align-items: center;
   gap: 6px;
   background: rgba(0, 0, 0, 0.6);
-  padding: 6px 14px;
-  border-radius: 20px;
+  padding: 4px 10px;
+  border-radius: 16px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   color: white;
   letter-spacing: 1px;
@@ -643,13 +622,12 @@ body {
 
 .vc-fs-countdown {
   background: rgba(0, 0, 0, 0.6);
-  padding: 6px 14px;
-  border-radius: 20px;
+  padding: 4px 10px;
+  border-radius: 16px;
   font-family: var(--font-mono);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: white;
-  letter-spacing: 1px;
 }
 
 .vc-fs-progress-track {
@@ -657,7 +635,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 3px;
   background: rgba(255, 255, 255, 0.2);
   z-index: 11;
 }
@@ -676,16 +654,16 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 0 20px 40px;
+  gap: 4px;
+  padding: 0 12px 12px;
   z-index: 10;
 }
 
 .vc-fs-stop-btn {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  border: 4px solid white;
+  border: 3px solid white;
   background: transparent;
   display: flex;
   align-items: center;
@@ -695,15 +673,15 @@ body {
 }
 
 .vc-fs-stop-square {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
   background: #ef4444;
 }
 
 .vc-fs-stop-label {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.8);
 }

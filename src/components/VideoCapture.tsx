@@ -230,12 +230,12 @@ export default function VideoCapture({ onFramesReady }: Props) {
   const progress = Math.min(1, elapsed / MAX_DURATION);
 
   return (
-    <div className={`video-capture ${isRecording ? "vc-is-fullscreen" : ""}`}>
-      {/* Single video container — goes fullscreen when recording */}
-      <div className={isRecording ? "vc-fullscreen" : "vc-viewfinder"}>
+    <div className="video-capture">
+      {/* Viewfinder — NEVER changes className to avoid iOS video freeze */}
+      <div className="vc-viewfinder">
         <video
           ref={videoRef}
-          className={isRecording ? "vc-fullscreen-video" : "vc-video"}
+          className="vc-video"
           autoPlay
           muted
           playsInline
@@ -243,7 +243,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
           loop={mode === "recorded"}
         />
 
-        {/* Idle overlay */}
         {mode === "idle" && (
           <div className="vc-idle-overlay">
             <button className="btn btn-primary" onClick={startCamera}>
@@ -252,7 +251,7 @@ export default function VideoCapture({ onFramesReady }: Props) {
           </div>
         )}
 
-        {/* Recording overlays */}
+        {/* Recording overlay — sits on top of the same viewfinder */}
         {isRecording && (
           <>
             <div className="vc-fs-top">
@@ -276,7 +275,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
           </>
         )}
 
-        {/* Extracting overlay */}
         {extracting && (
           <div className="vc-extracting-overlay">
             <div className="spinner" />
