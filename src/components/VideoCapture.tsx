@@ -118,10 +118,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
     recorder.start();
     setMode("recording");
 
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {});
-    }
-
     const startTime = Date.now();
     startTimeRef.current = startTime;
     timerRef.current = window.setInterval(() => {
@@ -229,135 +225,126 @@ export default function VideoCapture({ onFramesReady }: Props) {
     };
   }, [stopCamera]);
 
+  const isRecording = mode === "recording";
   const remaining = Math.ceil(Math.max(0, MAX_DURATION - elapsed));
   const progress = Math.min(1, elapsed / MAX_DURATION);
 
   return (
-    <div className={`video-capture ${mode === "recording" ? "vc-is-fullscreen" : ""}`}>
-      {/* Fullscreen recording mode */}
-      {mode === "recording" ? (
-        <div className="vc-fullscreen">
-          <video
-            ref={videoRef}
-            className="vc-fullscreen-video"
-            autoPlay
-            muted
-            playsInline
-            disablePictureInPicture
-          />
+    <div className={`video-capture ${isRecording ? "vc-is-fullscreen" : ""}`}>
+      {/* Single video container — goes fullscreen when recording */}
+      <div className={isRecording ? "vc-fullscreen" : "vc-viewfinder"}>
+        <video
+          ref={videoRef}
+          className={isRecording ? "vc-fullscreen-video" : "vc-video"}
+          autoPlay
+          muted
+          playsInline
+          disablePictureInPicture
+          loop={mode === "recorded"}
+        />
 
-          {/* Top bar: REC + countdown */}
-          <div className="vc-fs-top">
-            <div className="vc-rec-badge">
-              <span className="vc-rec-dot" />
-              REC
-            </div>
-            <div className="vc-fs-countdown">{remaining}s</div>
-          </div>
-
-          {/* Progress bar */}
-          <div className="vc-fs-progress-track">
-            <div className="vc-fs-progress-fill" style={{ width: `${progress * 100}%` }} />
-          </div>
-
-          {/* Bottom: stop button */}
-          <div className="vc-fs-bottom">
-            <button className="vc-fs-stop-btn" onClick={stopRecording}>
-              <span className="vc-fs-stop-square" />
+        {/* Idle overlay */}
+        {mode === "idle" && (
+          <div className="vc-idle-overlay">
+            <button className="btn btn-primary" onClick={startCamera}>
+              Open Camera
             </button>
-            <span className="vc-fs-stop-label">Tap to stop</span>
           </div>
-        </div>
-      ) : (
-        <>
-          {/* Normal viewfinder */}
-          <div className="vc-viewfinder">
-            <video
-              ref={videoRef}
-              className="vc-video"
-              autoPlay
-              muted
-              playsInline
-              disablePictureInPicture
-              loop={mode === "recorded"}
-            />
+        )}
 
-            {mode === "idle" && (
-              <div className="vc-idle-overlay">
-                <button className="btn btn-primary" onClick={startCamera}>
-                  Open Camera
-                </button>
+        {/* Recording overlays */}
+        {isRecording && (
+          <>
+            <div className="vc-fs-top">
+              <div className="vc-rec-badge">
+                <span className="vc-rec-dot" />
+                REC
               </div>
-            )}
-
-            {extracting && (
-              <div className="vc-extracting-overlay">
-                <div className="spinner" />
-                <span>Selecting best frames...</span>
-              </div>
-            )}
-          </div>
-
-          {/* Controls */}
-          <div className="vc-controls">
-            {mode === "previewing" && (
-              <button className="vc-record-btn" onClick={startRecording}>
-                <span className="vc-record-inner" />
-                <span className="vc-record-label">Record</span>
-              </button>
-            )}
-
-            {mode === "recorded" && (
-              <button className="btn btn-ghost" onClick={handleReset}>
-                Re-record
-              </button>
-            )}
-
-            {(mode === "idle" || mode === "previewing") && (
-              <>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  Upload video instead
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={handleFileUpload}
-                  hidden
-                />
-              </>
-            )}
-          </div>
-
-          {error && <div className="error-box">{error}</div>}
-
-          {/* Captured frames preview */}
-          {frames.length > 0 && (
-            <div className="vc-frames">
-              <p className="text-secondary" style={{ fontSize: 12 }}>
-                {frames.length} frames captured
-              </p>
-              <div className="vc-frame-grid-3">
-                {frames.map((f, i) => (
-                  <div key={i} className="vc-frame-thumb">
-                    <img src={f.dataUrl} alt={`Frame ${i + 1}`} />
-                    <span className="vc-frame-label">{f.timestamp.toFixed(1)}s</span>
-                  </div>
-                ))}
-              </div>
-              <button
-                className="btn btn-primary btn-large"
-                onClick={handleAnalyze}
-                disabled={extracting}
-              >
-                Analyze Shelf
-              </button>
+              <div className="vc-fs-countdown">{remaining}s</div>
             </div>
+
+            <div className="vc-fs-progress-track">
+              <div className="vc-fs-progress-fill" style={{ width: `${progress * 100}%` }} />
+            </div>
+
+            <div className="vc-fs-bottom">
+              <button className="vc-fs-stop-btn" onClick={stopRecording}>
+                <span className="vc-fs-stop-square" />
+              </button>
+              <span className="vc-fs-stop-label">Tap to stop</span>
+            </div>
+          </>
+        )}
+
+        {/* Extracting overlay */}
+        {extracting && (
+          <div className="vc-extracting-overlay">
+            <div className="spinner" />
+            <span>Selecting best frames...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Controls — hidden during recording */}
+      {!isRecording && (
+        <div className="vc-controls">
+          {mode === "previewing" && (
+            <button className="vc-record-btn" onClick={startRecording}>
+              <span className="vc-record-inner" />
+              <span className="vc-record-label">Record</span>
+            </button>
           )}
-        </>
+
+          {mode === "recorded" && (
+            <button className="btn btn-ghost" onClick={handleReset}>
+              Re-record
+            </button>
+          )}
+
+          {(mode === "idle" || mode === "previewing") && (
+            <>
+              <button
+                className="btn btn-ghost"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Upload video instead
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleFileUpload}
+                hidden
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {error && <div className="error-box">{error}</div>}
+
+      {/* Captured frames preview */}
+      {frames.length > 0 && (
+        <div className="vc-frames">
+          <p className="text-secondary" style={{ fontSize: 12 }}>
+            {frames.length} frames captured
+          </p>
+          <div className="vc-frame-grid-3">
+            {frames.map((f, i) => (
+              <div key={i} className="vc-frame-thumb">
+                <img src={f.dataUrl} alt={`Frame ${i + 1}`} />
+                <span className="vc-frame-label">{f.timestamp.toFixed(1)}s</span>
+              </div>
+            ))}
+          </div>
+          <button
+            className="btn btn-primary btn-large"
+            onClick={handleAnalyze}
+            disabled={extracting}
+          >
+            Analyze Shelf
+          </button>
+        </div>
       )}
     </div>
   );
