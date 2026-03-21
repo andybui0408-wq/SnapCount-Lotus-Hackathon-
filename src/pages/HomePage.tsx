@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { getScans, getDepletionData } from "../services/scanHistory";
+import AIBriefingCard from "../components/AIBriefingCard";
 import type { TabId } from "../types";
 
 interface Props {
@@ -28,9 +29,6 @@ export default function HomePage({ onTabChange }: Props) {
 
   const displayScans = filteredScans.length > 0 ? filteredScans : scans;
 
-  // Most recent scan thumbnail for hero banner background
-  const heroThumb = scans.length > 0 ? scans[0].thumbnail : null;
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)", overflow: "hidden" }}>
       {/* Search bar */}
@@ -44,26 +42,9 @@ export default function HomePage({ onTabChange }: Props) {
         />
       </div>
 
-      {/* Hero banner */}
-      <div className="home-hero">
-        {heroThumb && (
-          <img
-            src={`data:image/jpeg;base64,${heroThumb}`}
-            alt=""
-            className="home-hero-bg"
-          />
-        )}
-        <div className="home-hero-overlay">
-          <div>
-            <div className="home-hero-title">Inventory</div>
-            <div className="home-hero-title">at a Glance.</div>
-          </div>
-          <div className="home-hero-dots">
-            <div className="home-hero-dot active" />
-            <div className="home-hero-dot" />
-            <div className="home-hero-dot" />
-          </div>
-        </div>
+      {/* AI Briefing */}
+      <div style={{ padding: "0 20px" }}>
+        <AIBriefingCard />
       </div>
 
       {/* Previous scans */}

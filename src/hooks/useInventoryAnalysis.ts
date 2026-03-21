@@ -233,11 +233,11 @@ export function useInventoryAnalysis() {
       const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => {
         let framePreds = flatToMerged(perFrameFlat[i]);
 
-        // Fallback: if DINO found nothing for this frame, use Gemini boxes
-        if (framePreds.length === 0 && geminiProducts.length > 0) {
+        // Fallback: only apply Gemini boxes to frame 0 (Gemini prompt asks for first photo boxes only)
+        if (i === 0 && framePreds.length === 0 && geminiProducts.length > 0) {
           const fallback = geminiBboxToPredictions(geminiProducts, allDims[i].width, allDims[i].height);
           if (fallback.length > 0) {
-            console.log("[COUNTR] Frame %d: DINO empty, using Gemini bbox fallback (%d boxes)", i, fallback.length);
+            console.log("[COUNTR] Frame 0: DINO empty, using Gemini bbox fallback (%d boxes)", fallback.length);
             framePreds = fallback;
           }
         }

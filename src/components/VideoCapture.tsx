@@ -16,8 +16,8 @@ const TOTAL_CANDIDATES = 20;
 const CAPTURE_INTERVAL_MS = 500; // capture a frame every 500ms during recording
 
 const GUIDANCE: { start: number; end: number; text: string }[] = [
-  { start: 0, end: 3, text: "Start facing the shelf straight on" },
-  { start: 3, end: 7, text: "Now slowly move to the side \u2192" },
+  { start: 0, end: 3, text: "Face the shelf straight on" },
+  { start: 3, end: 7, text: "Slowly move to the side" },
   { start: 7, end: 10, text: "Keep going for the other angle" },
 ];
 
@@ -40,6 +40,9 @@ export default function VideoCapture({ onFramesReady }: Props) {
   const capturedRef = useRef<LiveCapture[]>([]);
   const startTimeRef = useRef<number>(0);
 
+  // Prevent duplicate starts from overlapping touch/mouse events
+  const isRecordingRef = useRef(false);
+
   // Start camera preview
   const startCamera = useCallback(async () => {
     setError(null);
@@ -60,6 +63,11 @@ export default function VideoCapture({ onFramesReady }: Props) {
     }
   }, []);
 
+  // Auto-start camera on mount
+  useEffect(() => {
+    startCamera();
+  }, [startCamera]);
+
   // Stop camera stream
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -70,9 +78,11 @@ export default function VideoCapture({ onFramesReady }: Props) {
 
   // Start recording — also begins live frame capture
   const startRecording = useCallback(() => {
+    if (isRecordingRef.current) return;
     const stream = streamRef.current;
     if (!stream) return;
 
+    isRecordingRef.current = true;
     chunksRef.current = [];
     capturedRef.current = [];
     setElapsed(0);
@@ -92,6 +102,7 @@ export default function VideoCapture({ onFramesReady }: Props) {
     };
 
     recorder.onstop = () => {
+      isRecordingRef.current = false;
       clearInterval(captureTimerRef.current);
       const blob = new Blob(chunksRef.current, { type: mimeType });
       stopCamera();
@@ -225,7 +236,9 @@ export default function VideoCapture({ onFramesReady }: Props) {
     setElapsed(0);
     setFrames([]);
     setError(null);
-  }, [stopRecording, stopCamera]);
+    // Re-open camera
+    setTimeout(() => startCamera(), 100);
+  }, [stopRecording, stopCamera, startCamera]);
 
   // Analyze with extracted frames
   const handleAnalyze = () => {
@@ -244,6 +257,11 @@ export default function VideoCapture({ onFramesReady }: Props) {
 
   // Get current guidance text
   const guidanceText = GUIDANCE.find((g) => elapsed >= g.start && elapsed < g.end)?.text || "";
+
+  // Timer progress for the ring
+  const progress = Math.min(elapsed / MAX_DURATION, 1);
+  const circumference = 2 * Math.PI * 34; // radius 34
+  const dashOffset = circumference * (1 - progress);
 
   // Compute max sharpness for normalizing bars
   const maxSharpness = frames.length > 0 ? Math.max(...frames.map((f) => f.sharpness)) : 1;
@@ -268,13 +286,31 @@ export default function VideoCapture({ onFramesReady }: Props) {
           </div>
         )}
 
+        {/* Recording overlay — large centered timer */}
         {mode === "recording" && (
           <div className="vc-recording-overlay">
-            <div className="vc-rec-indicator">
+            <div className="vc-timer-center">
+              <svg className="vc-timer-ring" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
+                <circle
+                  cx="40" cy="40" r="34"
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={dashOffset}
+                  transform="rotate(-90 40 40)"
+                />
+              </svg>
+              <div className="vc-timer-text">
+                <span className="vc-timer-seconds">{Math.floor(elapsed)}</span>
+                <span className="vc-timer-unit">s</span>
+              </div>
+            </div>
+            <div className="vc-rec-badge">
               <span className="vc-rec-dot" />
-              <span className="vc-rec-time">
-                {Math.floor(elapsed)}s / {MAX_DURATION}s
-              </span>
+              REC
             </div>
             {guidanceText && <div className="vc-guidance">{guidanceText}</div>}
           </div>
@@ -291,16 +327,27 @@ export default function VideoCapture({ onFramesReady }: Props) {
       {/* Controls */}
       <div className="vc-controls">
         {mode === "previewing" && (
-          <button className="vc-record-btn" onClick={startRecording}>
-            <span className="vc-record-icon" />
-            Record
+          <button
+            className="vc-hold-btn"
+            onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
+            onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
+            onMouseDown={startRecording}
+            onMouseUp={stopRecording}
+            onMouseLeave={() => { if (isRecordingRef.current) stopRecording(); }}
+          >
+            <span className="vc-hold-inner" />
+            <span className="vc-hold-label">Hold to record</span>
           </button>
         )}
 
         {mode === "recording" && (
-          <button className="vc-stop-btn" onClick={stopRecording}>
-            <span className="vc-stop-icon" />
-            Stop
+          <button
+            className="vc-hold-btn recording"
+            onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
+            onMouseUp={stopRecording}
+          >
+            <span className="vc-hold-inner recording" />
+            <span className="vc-hold-label">Release to stop</span>
           </button>
         )}
 
@@ -340,7 +387,7 @@ export default function VideoCapture({ onFramesReady }: Props) {
           <div className="vc-frame-grid-5">
             {frames.map((f, i) => {
               const pct = maxSharpness > 0 ? (f.sharpness / maxSharpness) * 100 : 100;
-              const barColor = pct > 70 ? "var(--accent-light)" : "var(--warning)";
+              const barColor = pct > 70 ? "var(--black)" : "var(--stone)";
               return (
                 <div key={i} className="vc-frame-thumb">
                   <img src={f.dataUrl} alt={`Frame ${i + 1}`} />
