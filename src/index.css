@@ -550,14 +550,21 @@ body {
   gap: var(--space-md);
 }
 
+/* When recording, make the whole component fullscreen */
+.vc-is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  gap: 0;
+}
+
 .vc-viewfinder {
   position: relative;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: #000;
   aspect-ratio: 4 / 3;
-  max-height: 360px;
-  contain: layout size;
 }
 
 .vc-video {
@@ -565,8 +572,6 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
-  /* Prevent iOS fullscreen */
-  -webkit-transform: translateZ(0);
 }
 
 .vc-idle-overlay,
@@ -583,31 +588,41 @@ body {
   font-size: 14px;
 }
 
-.vc-recording-overlay {
+/* ── Fullscreen recording view ─────────────────────────────── */
+.vc-fullscreen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.vc-fullscreen-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vc-fs-top {
   position: absolute;
-  inset: 0;
-  pointer-events: none;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  padding: 16px 20px 8px;
   z-index: 10;
 }
 
-/* REC badge — top right */
 .vc-rec-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 14px;
   border-radius: 20px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: white;
   letter-spacing: 1px;
@@ -626,6 +641,74 @@ body {
   50% { opacity: 0.3; }
 }
 
+.vc-fs-countdown {
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 1px;
+}
+
+.vc-fs-progress-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  z-index: 11;
+}
+
+.vc-fs-progress-fill {
+  height: 100%;
+  background: #ef4444;
+  transition: width 0.1s linear;
+}
+
+.vc-fs-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 40px;
+  z-index: 10;
+}
+
+.vc-fs-stop-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 4px solid white;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vc-fs-stop-square {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #ef4444;
+}
+
+.vc-fs-stop-label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ── Controls (non-recording) ──────────────────────────────── */
 .vc-controls {
   display: flex;
   flex-direction: column;
@@ -634,8 +717,8 @@ body {
   justify-content: center;
 }
 
-/* Hold-to-record button */
-.vc-hold-btn {
+/* Click-to-record button */
+.vc-record-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -645,27 +728,22 @@ body {
   cursor: pointer;
   padding: 8px;
   -webkit-tap-highlight-color: transparent;
-  touch-action: none;
-  user-select: none;
 }
 
-.vc-hold-inner {
+.vc-record-inner {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: var(--black);
-  border: 4px solid var(--border);
-  transition: transform 0.15s, background 0.15s;
-}
-
-.vc-hold-btn:active .vc-hold-inner,
-.vc-hold-inner.recording {
-  transform: scale(1.15);
   background: #ef4444;
-  border-color: #ef4444;
+  border: 4px solid var(--border);
+  transition: transform 0.15s;
 }
 
-.vc-hold-label {
+.vc-record-btn:active .vc-record-inner {
+  transform: scale(0.9);
+}
+
+.vc-record-label {
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 500;

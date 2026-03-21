@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { sendInventoryReport } from "../services/emailReport";
 import { generateInventoryReportHTML } from "../services/reportGenerator";
 import { getProductTrends, getDepletionData } from "../services/scanHistory";
 
@@ -12,27 +11,43 @@ interface Props {
 export default function EmailReportButton({ disabled }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY) || "");
-  const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSend = async () => {
-    if (!email.trim()) return;
+  const generateReport = () => {
+    const trends = getProductTrends();
+    const depletion = getDepletionData();
+    const now = new Date();
+    const dateStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+    return { html: generateInventoryReportHTML(trends.datasets, depletion, dateStr), dateStr };
+  };
 
-    setSending(true);
-    setStatus("idle");
-    setErrorMsg("");
+  const handleSendViaMailApp = () => {
+    if (!email.trim()) return;
 
     try {
       localStorage.setItem(EMAIL_KEY, email.trim());
+      const { html, dateStr } = generateReport();
 
-      const trends = getProductTrends();
+      // Build a plain-text summary from depletion data for the mailto body
       const depletion = getDepletionData();
-      const now = new Date();
-      const dateStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+      const lines = depletion.map(
+        (d) => `${d.name}: ${d.currentStock} left (${d.daysLeft >= 999 ? "stable" : `~${d.daysLeft.toFixed(0)} days`}) [${d.status.toUpperCase()}]`,
+      );
+      const body = `COUNTR. Inventory Report — ${dateStr}\n\n${lines.join("\n")}\n\n(Full HTML report attached or view below)`;
 
-      const html = generateInventoryReportHTML(trends.datasets, depletion, dateStr);
-      await sendInventoryReport(email.trim(), html, `COUNTR. Inventory Report — ${dateStr}`);
+      const subject = `COUNTR. Inventory Report — ${dateStr}`;
+      const mailtoUrl = `mailto:${encodeURIComponent(email.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(mailtoUrl, "_blank");
+
+      // Also save full HTML report for download
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `COUNTR-Report-${dateStr.replace(/\//g, "-")}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
 
       setStatus("success");
       setTimeout(() => {
@@ -41,9 +56,29 @@ export default function EmailReportButton({ disabled }: Props) {
       }, 2000);
     } catch (err) {
       setStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "Failed to send");
-    } finally {
-      setSending(false);
+      setErrorMsg(err instanceof Error ? err.message : "Failed to generate report");
+    }
+  };
+
+  const handleDownloadOnly = () => {
+    try {
+      const { html, dateStr } = generateReport();
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `COUNTR-Report-${dateStr.replace(/\//g, "-")}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      setStatus("success");
+      setTimeout(() => {
+        setShowModal(false);
+        setStatus("idle");
+      }, 2000);
+    } catch (err) {
+      setStatus("error");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to generate report");
     }
   };
 
@@ -58,24 +93,24 @@ export default function EmailReportButton({ disabled }: Props) {
       </button>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => !sending && setShowModal(false)}>
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Email Report</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)} disabled={sending}>
+              <h2>Send Report</h2>
+              <button className="modal-close" onClick={() => setShowModal(false)}>
                 ×
               </button>
             </div>
             <div className="modal-body">
               <p className="text-secondary" style={{ fontSize: 12 }}>
-                Send a branded inventory report with stock status and trends.
+                Opens your email app with a summary. Full report downloads as HTML.
               </p>
               <input
                 type="email"
-                placeholder="Email address..."
+                placeholder="Recipient email..."
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                onKeyDown={(e) => e.key === "Enter" && handleSendViaMailApp()}
                 style={{
                   width: "100%",
                   background: "var(--white)",
@@ -89,7 +124,7 @@ export default function EmailReportButton({ disabled }: Props) {
               />
 
               {status === "success" && (
-                <div className="success-box">Report sent!</div>
+                <div className="success-box">Report ready!</div>
               )}
               {status === "error" && (
                 <div className="error-box">{errorMsg}</div>
@@ -97,10 +132,17 @@ export default function EmailReportButton({ disabled }: Props) {
 
               <button
                 className="btn btn-primary btn-large"
-                onClick={handleSend}
-                disabled={sending || !email.trim()}
+                onClick={handleSendViaMailApp}
+                disabled={!email.trim()}
               >
-                {sending ? "Sending..." : "Send Report"}
+                Open Mail App
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={handleDownloadOnly}
+                style={{ marginTop: 4 }}
+              >
+                Download Report Only
               </button>
             </div>
           </div>
