@@ -6,7 +6,7 @@ import { analyzeMultiAngle, analyzeSinglePhoto } from "../services/geminiMultiAn
 import { matchCatalog, getCatalog } from "../services/productCatalog";
 import { mergeMultiAngle, mergeSinglePhoto } from "../services/mergeResults";
 import { saveScan } from "../services/scanHistory";
-import type { ScanResult, MergedPrediction, MergedItem } from "../types";
+import type { ScanResult, MergedPrediction, MergedItem, AngleAnnotation } from "../types";
 import { THUMBNAIL_SIZE, THUMBNAIL_QUALITY } from "../constants/config";
 
 interface AnalysisState {
@@ -114,40 +114,44 @@ export function useInventoryAnalysis() {
     setState({ loading: true, error: null, result: null });
 
     try {
-      const imgDims = await getImageDims(photos[0]);
+      // Get dimensions for all frames in parallel
+      const allDims = await Promise.all(photos.map((p) => getImageDims(p)));
+      const imgDims = allDims[0];
 
       // ═══════════════════════════════════════════════════════════
-      // Step 1: Grounding DINO detection + OCR (in parallel)
+      // Step 1: Grounding DINO on ALL frames + OCR (in parallel)
       // ═══════════════════════════════════════════════════════════
-      console.log("[COUNTR] Step 1: Grounding DINO + OCR on Photo 1...");
+      console.log("[COUNTR] Step 1: Grounding DINO on %d frames + OCR...", photos.length);
+
+      const dinoPromises = photos.map((photo, i) =>
+        detectProducts(photo).then(
+          (res) => { console.log("[COUNTR] DINO frame %d: %d predictions", i, res.predictions.length); return res; },
+          (err) => { console.error("[COUNTR] DINO frame %d FAILED:", i, err); return null; },
+        ),
+      );
 
       const settled = await Promise.allSettled([
-        detectProducts(photos[0]),
+        Promise.all(dinoPromises),
         readLabelsFromImage(photos[0]),
       ]);
 
-      let dinoResult = null;
-      let dinoError = "";
-      if (settled[0].status === "fulfilled") {
-        dinoResult = settled[0].value;
-        console.log("[COUNTR] DINO raw response: %d predictions, image=%dx%d",
-          dinoResult.predictions.length, dinoResult.image?.width, dinoResult.image?.height);
-      } else {
-        dinoError = settled[0].reason instanceof Error ? settled[0].reason.message : String(settled[0].reason);
-        console.error("[COUNTR] DINO FAILED:", dinoError);
-      }
+      const dinoResults = settled[0].status === "fulfilled" ? settled[0].value : photos.map(() => null);
+      const dinoResult = dinoResults[0]; // frame 0 for main pipeline
 
       const ocrTexts = settled[1].status === "fulfilled" ? settled[1].value : [] as string[];
       if (settled[1].status === "rejected") {
         console.error("[COUNTR] OCR FAILED:", settled[1].reason);
       }
 
-      // Flatten DINO results (bounding boxes → polygon format)
-      const flatPredictions: FlatPrediction[] = dinoResult
-        ? flattenDINOResults(dinoResult)
-        : [];
+      // Flatten DINO results for each frame
+      const perFrameFlat: FlatPrediction[][] = dinoResults.map((dr) =>
+        dr ? flattenDINOResults(dr) : [],
+      );
 
-      console.log("[COUNTR] DINO found %d boxes", flatPredictions.length);
+      // Frame 0 flat predictions drive the main pipeline
+      const flatPredictions = perFrameFlat[0];
+      console.log("[COUNTR] DINO frame 0: %d boxes, total across frames: %d",
+        flatPredictions.length, perFrameFlat.reduce((s, f) => s + f.length, 0));
 
       // ═══════════════════════════════════════════════════════════
       // Step 2: DINOv2 catalog matching on each box crop
@@ -224,16 +228,34 @@ export function useInventoryAnalysis() {
       }
 
       // ═══════════════════════════════════════════════════════════
-      // Fallback: Use Gemini bounding boxes when DINO found nothing
+      // Build per-frame angle annotations
       // ═══════════════════════════════════════════════════════════
-      if (predictions.length === 0 && geminiProducts.length > 0) {
-        console.log("[COUNTR] DINO returned 0 boxes — using Gemini bounding boxes as fallback");
-        const geminiBboxes = geminiBboxToPredictions(geminiProducts, imgDims.width, imgDims.height);
-        if (geminiBboxes.length > 0) {
-          predictions = geminiBboxes;
-          console.log("[COUNTR] Gemini provided %d bounding boxes", predictions.length);
+      const geminiFallbackPreds = geminiProducts.length > 0
+        ? geminiBboxToPredictions(geminiProducts, imgDims.width, imgDims.height)
+        : [];
+
+      const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => {
+        let framePreds = flatToMerged(perFrameFlat[i]);
+
+        // Fallback: if DINO found nothing for this frame, use Gemini boxes (frame 0 only)
+        if (framePreds.length === 0 && i === 0 && geminiFallbackPreds.length > 0) {
+          console.log("[COUNTR] Frame %d: using Gemini bbox fallback (%d boxes)", i, geminiFallbackPreds.length);
+          framePreds = geminiFallbackPreds;
         }
-      }
+
+        return {
+          predictions: framePreds,
+          imageWidth: allDims[i].width,
+          imageHeight: allDims[i].height,
+          label: `Frame ${i + 1}`,
+        };
+      });
+
+      // Primary predictions = frame 0's annotations (backward compat)
+      predictions = angleAnnotations[0].predictions;
+
+      console.log("[COUNTR] Per-frame boxes: %s",
+        angleAnnotations.map((a, i) => `frame${i}=${a.predictions.length}`).join(", "));
 
       const thumbnail = await makeThumbnail(photos[0]);
 
@@ -241,8 +263,8 @@ export function useInventoryAnalysis() {
       const totalDepth = items.reduce((sum, i) => sum + i.depth_visible, 0);
       const totalItems = items.reduce((sum, i) => sum + i.total, 0);
 
-      console.log("[COUNTR] Final: front=%d depth=%d total=%d boxes=%d",
-        totalFront, totalDepth, totalItems, predictions.length);
+      console.log("[COUNTR] Final: front=%d depth=%d total=%d",
+        totalFront, totalDepth, totalItems);
 
       const scan: ScanResult = {
         id: Date.now().toString(36),
@@ -257,6 +279,7 @@ export function useInventoryAnalysis() {
         predictions,
         imageWidth: imgDims.width,
         imageHeight: imgDims.height,
+        angleAnnotations,
       };
 
       saveScan(scan);

@@ -116,19 +116,27 @@ export default function ScanPage() {
 
       {error && <div className="error-box">{error}</div>}
 
-      {result && (
+      {result && (() => {
+        // Use per-frame annotations when available, fallback to shared predictions
+        const frameAnno = result.angleAnnotations?.[selectedFrame];
+        const framePreds = frameAnno?.predictions || result.predictions || [];
+        const frameW = frameAnno?.imageWidth || result.imageWidth || 1024;
+        const frameH = frameAnno?.imageHeight || result.imageHeight || 768;
+        const frameImg = `data:image/jpeg;base64,${photos[selectedFrame] || photos[0]}`;
+
+        return (
         <>
-          {result.predictions && result.predictions.length > 0 ? (
+          {framePreds.length > 0 ? (
             <BoundingBoxOverlay
-              imageSrc={`data:image/jpeg;base64,${photos[selectedFrame] || photos[0]}`}
-              predictions={result.predictions}
-              imageWidth={result.imageWidth || 1024}
-              imageHeight={result.imageHeight || 768}
+              imageSrc={frameImg}
+              predictions={framePreds}
+              imageWidth={frameW}
+              imageHeight={frameH}
               items={result.items}
             />
           ) : (
             <div className="bbox-container">
-              <img src={`data:image/jpeg;base64,${photos[selectedFrame] || photos[0]}`} alt="Result" style={{ width: "100%", borderRadius: "var(--radius-md)" }} />
+              <img src={frameImg} alt="Result" style={{ width: "100%", borderRadius: "var(--radius-md)" }} />
               {result.items.length === 0 && (
                 <p className="text-secondary" style={{ textAlign: "center", marginTop: 4 }}>
                   No detections found. Try a clearer photo.
@@ -171,7 +179,8 @@ export default function ScanPage() {
 
           <ResultsList items={result.items} />
         </>
-      )}
+        );
+      })()}
 
       {showVocab && <VocabularyEditor onClose={() => setShowVocab(false)} />}
       {showCatalog && <CatalogBuilder onClose={() => setShowCatalog(false)} />}
