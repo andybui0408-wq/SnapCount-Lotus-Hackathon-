@@ -40,7 +40,7 @@ export const DEFAULT_VOCABULARY: string[] = [
 // Prompts
 // Note: Multi-angle prompt is built dynamically in geminiMultiAngle.ts (variable frame count)
 
-// Single photo: detect + count visible items, return bounding boxes
+// Single photo: detect + count visible items, return bounding boxes + price
 export const SINGLE_PHOTO_PROMPT = `You are counting inventory on a Vietnamese convenience store shelf.
 
 The detection system identified these products:
@@ -48,12 +48,14 @@ The detection system identified these products:
 
 Count only what is VISIBLE in this single photo. Do not estimate hidden items.
 
-For each product, provide bounding boxes as [ymin, xmin, ymax, xmax] coordinates normalized to 0-1000 scale (where 0,0 is top-left and 1000,1000 is bottom-right of the image). Include one box per visible instance or group.
+For each product:
+- Provide bounding boxes as [ymin, xmin, ymax, xmax] normalized to 0-1000 scale
+- ESTIMATE the typical Vietnamese retail sell price in VND (realistic Ho Chi Minh City prices 2024-2026). Examples: Coca-Cola can ~10000đ, instant noodle pack ~5000đ, beer can ~15000đ
 
 Return ONLY valid JSON, no markdown:
 {
   "products": [
-    { "product": "Coca-Cola can", "visible_count": 5, "boxes": [[120, 340, 250, 450], [120, 500, 250, 610]], "notes": "" }
+    { "product": "Coca-Cola can", "visible_count": 5, "boxes": [[120, 340, 250, 450]], "estimated_price": 10000, "notes": "" }
   ],
   "total_items": 20,
   "note": "Single angle — take a side photo to see depth"

@@ -2,9 +2,10 @@ import { useState } from "react";
 import { readLabelsFromImage } from "../services/geminiOCR";
 import { detectProducts, flattenDINOResults, cropBoxRegion } from "../services/groundingDinoAPI";
 import type { FlatPrediction, DINOResponse } from "../services/groundingDinoAPI";
-import { analyzeMultiAngle, analyzeSinglePhoto } from "../services/geminiMultiAngle";
+import { analyzeWithConsensus, analyzeSinglePhoto } from "../services/geminiMultiAngle";
 import { matchCatalog, getCatalog } from "../services/productCatalog";
-import { mergeMultiAngle, mergeSinglePhoto } from "../services/mergeResults";
+import { mergeConsensus, mergeSinglePhoto } from "../services/mergeResults";
+import { buildFrameDetections, computeConsensus } from "../services/consensusCount";
 import { saveScan } from "../services/scanHistory";
 import type { ScanResult, MergedPrediction, MergedItem, AngleAnnotation } from "../types";
 import { THUMBNAIL_SIZE, THUMBNAIL_QUALITY } from "../constants/config";
@@ -58,36 +59,7 @@ function flatToMerged(flat: FlatPrediction[]): MergedPrediction[] {
   }));
 }
 
-// Convert Gemini bounding boxes (normalized 0-1000) to MergedPredictions
-function geminiBboxToPredictions(
-  products: Array<{ product: string; boxes?: number[][] }>,
-  imageWidth: number,
-  imageHeight: number,
-): MergedPrediction[] {
-  const preds: MergedPrediction[] = [];
-  for (const gp of products) {
-    if (!gp.boxes || !Array.isArray(gp.boxes)) continue;
-    for (const box of gp.boxes) {
-      if (!Array.isArray(box) || box.length < 4) continue;
-      const [ymin, xmin, ymax, xmax] = box;
-      const x1 = (xmin / 1000) * imageWidth;
-      const y1 = (ymin / 1000) * imageHeight;
-      const x2 = (xmax / 1000) * imageWidth;
-      const y2 = (ymax / 1000) * imageHeight;
-      preds.push({
-        polygon: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]],
-        confidence: 1.0,
-        class: gp.product,
-        catalog_match: null,
-        catalog_similarity: 0,
-        id_method: "dino",
-      });
-    }
-  }
-  return preds;
-}
-
-// Format DINO detections as text for Gemini context
+// Format DINO detections as text for Gemini context (single photo path)
 function formatDetectionResults(flat: FlatPrediction[]): string {
   if (flat.length === 0) return "No products detected by the detection system.";
 
@@ -148,13 +120,12 @@ export function useInventoryAnalysis() {
         dr ? flattenDINOResults(dr) : [],
       );
 
-      // Frame 0 flat predictions drive the main pipeline
       const flatPredictions = perFrameFlat[0];
       console.log("[COUNTR] DINO frame 0: %d boxes, total across frames: %d",
         flatPredictions.length, perFrameFlat.reduce((s, f) => s + f.length, 0));
 
       // ═══════════════════════════════════════════════════════════
-      // Step 2: DINOv2 catalog matching on each box crop
+      // Step 2: DINOv2 catalog matching on frame 0 box crops
       // ═══════════════════════════════════════════════════════════
       const hasCatalog = getCatalog().length > 0;
 
@@ -180,68 +151,53 @@ export function useInventoryAnalysis() {
         console.log("[COUNTR] Catalog matching complete");
       }
 
-      // Build detection context for Gemini
-      const detectionContext = formatDetectionResults(flatPredictions);
       let predictions = flatToMerged(flatPredictions);
-
       let items: MergedItem[];
       let depthNotes = "";
 
-      let geminiProducts: Array<{ product: string; boxes?: number[][] }> = [];
-
       if (mode === "multi" && photos.length >= 2) {
         // ═══════════════════════════════════════════════════════════
-        // Step 3: Gemini multi-angle depth reasoning (single call)
+        // Step 3: Consensus counting — DINO on all frames
         // ═══════════════════════════════════════════════════════════
-        console.log("[COUNTR] Step 3: Gemini multi-angle reasoning...");
+        console.log("[COUNTR] Step 3: Building consensus from %d frames...", photos.length);
 
-        const geminiResult = await analyzeMultiAngle(photos, detectionContext).catch(() => null);
+        const frameDetections = buildFrameDetections(perFrameFlat, allDims);
+        const consensus = computeConsensus(frameDetections, photos.length);
 
-        console.log("[COUNTR] Gemini multi-angle result:", geminiResult);
+        console.log("[COUNTR] Consensus: %s",
+          consensus.map(c => `${c.product}=${c.consensusCount}(${c.confidence})`).join(", "));
 
-        if (geminiResult) {
-          items = mergeMultiAngle(predictions, geminiResult);
-          depthNotes = geminiResult.depth_notes || "";
-          geminiProducts = (geminiResult.products || []).map((p) => ({
-            product: p.product,
-            boxes: p.boxes,
-          }));
-        } else {
-          items = mergeMultiAngle(predictions, null);
-          depthNotes = "Gemini depth reasoning failed — showing detection counts only";
-        }
+        // ═══════════════════════════════════════════════════════════
+        // Step 4: Gemini consensus verification (all frames + consensus data)
+        // ═══════════════════════════════════════════════════════════
+        console.log("[COUNTR] Step 4: Gemini consensus verification...");
+
+        const geminiResult = await analyzeWithConsensus(photos, consensus, frameDetections).catch((err) => {
+          console.error("[COUNTR] Gemini consensus verification failed:", err);
+          return null;
+        });
+
+        console.log("[COUNTR] Gemini consensus result:", geminiResult);
+
+        items = mergeConsensus(geminiResult, consensus);
+        depthNotes = geminiResult?.depth_notes || "Multi-angle consensus counting";
       } else {
         // ═══════════════════════════════════════════════════════════
-        // Single photo: Gemini counts visible items
+        // Single photo: Gemini counts visible items + price
         // ═══════════════════════════════════════════════════════════
         console.log("[COUNTR] Single photo: Gemini counting...");
 
+        const detectionContext = formatDetectionResults(flatPredictions);
         const geminiResult = await analyzeSinglePhoto(photos[0], detectionContext).catch(() => null);
         items = mergeSinglePhoto(predictions, geminiResult);
         depthNotes = geminiResult?.note || "Single angle — take a side photo to see depth";
-        if (geminiResult?.products) {
-          geminiProducts = geminiResult.products.map((p) => ({
-            product: p.product,
-            boxes: p.boxes,
-          }));
-        }
       }
 
       // ═══════════════════════════════════════════════════════════
-      // Build per-frame angle annotations
+      // Build per-frame angle annotations (each frame's own DINO boxes)
       // ═══════════════════════════════════════════════════════════
       const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => {
-        let framePreds = flatToMerged(perFrameFlat[i]);
-
-        // Fallback: only apply Gemini boxes to frame 0 (Gemini prompt asks for first photo boxes only)
-        if (i === 0 && framePreds.length === 0 && geminiProducts.length > 0) {
-          const fallback = geminiBboxToPredictions(geminiProducts, allDims[i].width, allDims[i].height);
-          if (fallback.length > 0) {
-            console.log("[COUNTR] Frame 0: DINO empty, using Gemini bbox fallback (%d boxes)", fallback.length);
-            framePreds = fallback;
-          }
-        }
-
+        const framePreds = flatToMerged(perFrameFlat[i]);
         return {
           predictions: framePreds,
           imageWidth: allDims[i].width,
@@ -250,7 +206,7 @@ export function useInventoryAnalysis() {
         };
       });
 
-      // Primary predictions = frame 0's annotations (backward compat)
+      // Primary predictions = frame 0's annotations
       predictions = angleAnnotations[0].predictions;
 
       console.log("[COUNTR] Per-frame boxes: %s",

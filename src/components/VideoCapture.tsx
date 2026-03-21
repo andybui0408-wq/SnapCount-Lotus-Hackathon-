@@ -135,6 +135,11 @@ export default function VideoCapture({ onFramesReady }: Props) {
     recorder.start();
     setMode("recording");
 
+    // Ensure video keeps playing during recording (mobile Safari may stop it)
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+
     // Timer
     const startTime = Date.now();
     startTimeRef.current = startTime;
@@ -273,6 +278,7 @@ export default function VideoCapture({ onFramesReady }: Props) {
         <video
           ref={videoRef}
           className="vc-video"
+          autoPlay
           muted
           playsInline
           loop={mode === "recorded"}

@@ -2200,6 +2200,159 @@ body {
   color: var(--stone);
 }
 
+/* ── Price Confirmation ──────────────────────────────────────── */
+.price-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--off-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.price-confirm-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.price-confirm-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.price-confirm-subtitle {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--stone);
+}
+
+.price-confirm-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.price-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  gap: var(--space-md);
+}
+
+.price-confirm-row:last-child { border-bottom: none; }
+
+.price-confirm-name {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.price-confirm-ai {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--stone);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+}
+
+.btn-confirm-prices {
+  background: var(--off-white);
+  border: 1px solid var(--border);
+  color: var(--black);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  height: 44px;
+  width: 100%;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.btn-confirm-prices:hover { border-color: var(--charcoal); }
+
+/* ── Consensus Result Cards ─────────────────────────────────── */
+.result-row-consensus {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.result-consensus-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-count-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.result-count-breakdown {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--charcoal);
+}
+
+.result-conf-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-conf-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.result-conf-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.result-conf-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.result-frame-info {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--stone);
+}
+
+.result-adjustment {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--charcoal);
+  font-style: italic;
+}
+
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (min-width: 768px) {
   .app-shell { box-shadow: 0 0 40px rgba(0,0,0,0.05); }

@@ -1,6 +1,6 @@
-import type { MultiAngleResult, SinglePhotoResult } from "../services/geminiMultiAngle";
+import type { MultiAngleResult, SinglePhotoResult, ConsensusResult } from "../services/geminiMultiAngle";
 
-export type { MultiAngleResult, SinglePhotoResult };
+export type { MultiAngleResult, SinglePhotoResult, ConsensusResult };
 
 export interface MergedPrediction {
   polygon: number[][]; // [[x1,y1], [x2,y2], ...] from Grounding DINO boxes
@@ -16,8 +16,16 @@ export interface MergedItem {
   front_visible: number;
   depth_visible: number;
   total: number;
-  id_method: "catalog" | "dino" | "gemini" | "unmatched";
+  id_method: "catalog" | "dino" | "gemini" | "unmatched" | "consensus";
   notes?: string;
+  estimated_price?: number;
+  consensus_count?: number;
+  adjusted?: boolean;
+  adjustment_reason?: string;
+  confidence?: "high" | "medium" | "low";
+  framesDetected?: number;
+  totalFrames?: number;
+  spread?: number;
 }
 
 export interface AngleAnnotation {
