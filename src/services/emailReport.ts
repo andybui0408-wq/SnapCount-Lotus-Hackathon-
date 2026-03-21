@@ -1,20 +1,29 @@
+import emailjs from "@emailjs/browser";
+import { EMAILJS_PUBLIC_KEY, EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID } from "../constants/config";
+
+let initialized = false;
+
+function ensureInit() {
+  if (!initialized && EMAILJS_PUBLIC_KEY) {
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    initialized = true;
+  }
+}
+
 export async function sendInventoryReport(
   recipientEmail: string,
   reportHTML: string,
   subject: string,
 ): Promise<void> {
-  const res = await fetch("/api/send-email", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      to: recipientEmail,
-      subject,
-      html: reportHTML,
-    }),
-  });
+  ensureInit();
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({ error: "Failed to send email" }));
-    throw new Error(data.error || `Email failed (${res.status})`);
+  if (!EMAILJS_PUBLIC_KEY || !EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID) {
+    throw new Error("EmailJS not configured. Set VITE_EMAILJS_* in .env");
   }
+
+  await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    to_email: recipientEmail,
+    subject,
+    html_content: reportHTML,
+  });
 }

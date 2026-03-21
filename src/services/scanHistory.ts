@@ -1,9 +1,10 @@
 import type { ScanResult, InventorySnapshot, Supplier } from "../types";
 
-const SCANS_KEY = "snapcount_scans";
-const SNAPSHOTS_KEY = "snapcount_snapshots";
-const SUPPLIERS_KEY = "snapcount_suppliers";
-const SEEDED_KEY = "snapcount_seeded";
+const SCANS_KEY = "countr_scans";
+const SNAPSHOTS_KEY = "countr_snapshots";
+const SUPPLIERS_KEY = "countr_suppliers";
+const SEEDED_KEY = "countr_seeded";
+const PRICES_KEY = "countr_prices";
 
 // ── CRUD ────────────────────────────────────────────────────────────
 
@@ -141,11 +142,26 @@ export function seedDemoData(): void {
   localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(snapshots));
 
   const suppliers: Supplier[] = [
-    { id: "s1", name: "Đại lý Minh Phát", phone: "0912345678", category: "drinks" },
-    { id: "s2", name: "Hương Giang", phone: "0987654321", category: "food" },
-    { id: "s3", name: "NPP Tiger", phone: "0909876543", category: "beer" },
+    { id: "s1", name: "Đại lý nước giải khát Minh Phát", phone: "0912345678", category: "drinks" },
+    { id: "s2", name: "Cửa hàng thực phẩm Hương Giang", phone: "0987654321", category: "food" },
+    { id: "s3", name: "NPP Bia Tiger khu vực HCM", phone: "0909876543", category: "beer" },
+    { id: "s4", name: "Test Supplier", phone: "0971920305", category: "all" },
   ];
   localStorage.setItem(SUPPLIERS_KEY, JSON.stringify(suppliers));
+
+  // Seed demo sell prices
+  const demoPrices = [
+    { name: "Coca-Cola lon", sellPrice: 10000 },
+    { name: "Fanta Orange", sellPrice: 10000 },
+    { name: "Mì Hảo Hảo", sellPrice: 5000 },
+    { name: "Nước mắm Chin-Su", sellPrice: 25000 },
+    { name: "Trà xanh C2", sellPrice: 8000 },
+    { name: "Monster Energy", sellPrice: 22000 },
+    { name: "Bia Tiger", sellPrice: 15000 },
+    { name: "Bánh mì Kinh Đô", sellPrice: 12000 },
+  ];
+  localStorage.setItem(PRICES_KEY, JSON.stringify(demoPrices));
+
   localStorage.setItem(SEEDED_KEY, "true");
 }
 

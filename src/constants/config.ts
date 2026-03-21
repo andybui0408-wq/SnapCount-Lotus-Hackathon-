@@ -18,12 +18,23 @@ export const THUMBNAIL_QUALITY = 0.6;
 // Catalog
 export const CATALOG_SIMILARITY_THRESHOLD = 0.7;
 
-// Default vocabulary — short generic categories for Grounding DINO
-// (Gemini + OCR handle specific brand identification)
+// EmailJS
+export const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "";
+export const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || "";
+export const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "";
+
+// Default vocabulary — specific product names for tighter DINO boxes
 export const DEFAULT_VOCABULARY: string[] = [
-  "bottle", "can", "box", "bag", "pack", "carton",
-  "snack", "fruit", "vegetable", "food item", "drink",
-  "product on shelf",
+  "Coca-Cola can", "Coca-Cola bottle", "Pepsi can",
+  "Fanta Orange can", "Fanta Orange bottle", "Sprite can",
+  "Monster Energy can", "Red Bull can",
+  "Tiger beer can", "Tiger beer bottle", "Saigon beer can", "333 beer can",
+  "water bottle", "milk carton", "juice box", "C2 green tea bottle",
+  "instant noodle pack", "rice bag", "bread loaf", "snack bag", "chip bag",
+  "candy bar", "chocolate bar", "cookie package", "canned food",
+  "fish sauce bottle", "soy sauce bottle", "cooking oil bottle", "chili sauce bottle",
+  "soap bar", "shampoo bottle", "toothpaste tube", "detergent box", "tissue box",
+  "banana", "apple", "orange", "mango", "tomato", "onion", "garlic", "lime",
 ];
 
 // Prompts
