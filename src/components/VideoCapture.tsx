@@ -34,6 +34,14 @@ export default function VideoCapture({ onFramesReady }: Props) {
   const startTimeRef = useRef<number>(0);
   const isRecordingRef = useRef(false);
 
+  // Force iOS inline playback attributes
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.setAttribute("webkit-playsinline", "true");
+      videoRef.current.setAttribute("x-webkit-airplay", "deny");
+    }
+  }, []);
+
   const startCamera = useCallback(async () => {
     setError(null);
     try {
@@ -91,13 +99,12 @@ export default function VideoCapture({ onFramesReady }: Props) {
     recorder.onstop = () => {
       isRecordingRef.current = false;
       clearInterval(captureTimerRef.current);
-      const blob = new Blob(chunksRef.current, { type: mimeType });
-      stopCamera();
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-        videoRef.current.src = URL.createObjectURL(blob);
-        videoRef.current.play();
+      // Don't swap video source — keep camera feed visible to avoid jitter.
+      // Just pause the stream so the last frame stays frozen.
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
       }
 
       setMode("recorded");
@@ -243,6 +250,7 @@ export default function VideoCapture({ onFramesReady }: Props) {
           autoPlay
           muted
           playsInline
+          disablePictureInPicture
           loop={mode === "recorded"}
         />
 
