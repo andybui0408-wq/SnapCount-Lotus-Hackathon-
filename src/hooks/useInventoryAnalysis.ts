@@ -57,6 +57,36 @@ function flatToMerged(flat: FlatPrediction[]): MergedPrediction[] {
   }));
 }
 
+/** Convert Gemini's normalized 0-1000 boxes to MergedPredictions in pixel coords */
+function geminiBoxesToPredictions(
+  products: Array<{ product: string; boxes?: number[][]; visible_count?: number }>,
+  imgW: number,
+  imgH: number,
+): MergedPrediction[] {
+  const preds: MergedPrediction[] = [];
+  for (const gp of products) {
+    if (!gp.boxes || gp.boxes.length === 0) continue;
+    for (const box of gp.boxes) {
+      if (box.length < 4) continue;
+      // Gemini format: [ymin, xmin, ymax, xmax] normalized 0-1000
+      const [ymin, xmin, ymax, xmax] = box;
+      const x1 = (xmin / 1000) * imgW;
+      const y1 = (ymin / 1000) * imgH;
+      const x2 = (xmax / 1000) * imgW;
+      const y2 = (ymax / 1000) * imgH;
+      preds.push({
+        polygon: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]],
+        confidence: 0.8,
+        class: gp.product,
+        catalog_match: null,
+        catalog_similarity: 0,
+        id_method: "dino",
+      });
+    }
+  }
+  return preds;
+}
+
 function formatDetectionResults(flat: FlatPrediction[]): string {
   if (flat.length === 0) return "No products detected by the detection system.";
 
@@ -151,6 +181,19 @@ export function useInventoryAnalysis() {
 
         items = mergeConsensus(geminiResult, consensus);
         depthNotes = geminiResult?.depth_notes || "";
+
+        // Fallback: if DINO found nothing on frame 0, use Gemini's boxes
+        if (perFrameFlat[0].length === 0 && geminiResult?.products) {
+          console.log("[COUNTR] DINO empty — using Gemini consensus boxes as fallback");
+          const gBoxes = geminiResult.products.map(p => ({
+            product: p.name,
+            boxes: (p as unknown as { boxes?: number[][] }).boxes,
+          }));
+          const geminiPreds = geminiBoxesToPredictions(gBoxes, imgDims.width, imgDims.height);
+          if (geminiPreds.length > 0) {
+            predictions = geminiPreds;
+          }
+        }
       } else {
         // Single photo
         console.log("[COUNTR] Single photo: Gemini counting...");
@@ -159,15 +202,25 @@ export function useInventoryAnalysis() {
         const geminiResult = await analyzeSinglePhoto(photos[0], detectionContext).catch(() => null);
         items = mergeSinglePhoto(predictions, geminiResult);
         depthNotes = geminiResult?.note || "";
+
+        // Fallback: if DINO found nothing, use Gemini's bounding boxes
+        if (predictions.length === 0 && geminiResult?.products) {
+          console.log("[COUNTR] DINO empty — using Gemini boxes as fallback");
+          predictions = geminiBoxesToPredictions(geminiResult.products, imgDims.width, imgDims.height);
+          perFrameFlat[0] = []; // keep consistent
+        }
       }
 
       // Per-frame annotations
-      const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => ({
-        predictions: flatToMerged(perFrameFlat[i]),
-        imageWidth: allDims[i].width,
-        imageHeight: allDims[i].height,
-        label: `Frame ${i + 1}`,
-      }));
+      const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => {
+        const dinoPreds = flatToMerged(perFrameFlat[i]);
+        return {
+          predictions: dinoPreds.length > 0 ? dinoPreds : predictions,
+          imageWidth: allDims[i].width,
+          imageHeight: allDims[i].height,
+          label: `Frame ${i + 1}`,
+        };
+      });
 
       predictions = angleAnnotations[0].predictions;
 

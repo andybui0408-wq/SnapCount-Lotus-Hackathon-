@@ -116,8 +116,8 @@ export async function detectProducts(
       api_key: ROBOFLOW_API_KEY,
       image: { type: "base64", value: base64Image },
       text,
-      box_threshold: 0.35,
-      text_threshold: 0.25,
+      box_threshold: 0.2,
+      text_threshold: 0.2,
     }),
   });
 
