@@ -23,18 +23,10 @@ export const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "";
 export const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || "";
 export const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "";
 
-// Default vocabulary — specific product names for tighter DINO boxes
+// Default vocabulary — generic categories for open detection
+// Specific product names are identified by Gemini after detection
 export const DEFAULT_VOCABULARY: string[] = [
-  "Coca-Cola can", "Coca-Cola bottle", "Pepsi can",
-  "Fanta Orange can", "Fanta Orange bottle", "Sprite can",
-  "Monster Energy can", "Red Bull can",
-  "Tiger beer can", "Tiger beer bottle", "Saigon beer can", "333 beer can",
-  "water bottle", "milk carton", "juice box", "C2 green tea bottle",
-  "instant noodle pack", "rice bag", "bread loaf", "snack bag", "chip bag",
-  "candy bar", "chocolate bar", "cookie package", "canned food",
-  "fish sauce bottle", "soy sauce bottle", "cooking oil bottle", "chili sauce bottle",
-  "soap bar", "shampoo bottle", "toothpaste tube", "detergent box", "tissue box",
-  "banana", "apple", "orange", "mango", "tomato", "onion", "garlic", "lime",
+  "bottle", "can", "box", "bag", "package", "container", "fruit",
 ];
 
 // Prompts

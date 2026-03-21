@@ -5,11 +5,9 @@ import BoundingBoxOverlay from "../components/BoundingBoxOverlay";
 import VideoCapture from "../components/VideoCapture";
 import SummaryCards from "../components/SummaryCards";
 import ResultsList from "../components/ResultsList";
-import PriceConfirmation from "../components/PriceConfirmation";
+import ProductConfirmation from "../components/ProductConfirmation";
 import VocabularyEditor from "../components/VocabularyEditor";
 import CatalogBuilder from "../components/CatalogBuilder";
-import { getPrice } from "../services/priceStore";
-import { savePrices } from "../services/priceStore";
 import { MAX_IMAGE_SIZE, JPEG_QUALITY } from "../constants/config";
 
 export default function ScanPage() {
@@ -17,7 +15,7 @@ export default function ScanPage() {
   const [showVocab, setShowVocab] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState(0);
-  const [pricesConfirmed, setPricesConfirmed] = useState(false);
+  const [productsSaved, setProductsSaved] = useState(false);
   const { photos, setPhotos, setLastResult } = useScanContext();
   const { loading, error, result, analyze } = useInventoryAnalysis();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,34 +45,20 @@ export default function ScanPage() {
 
   const handleQuickAnalyze = async () => {
     if (photos.length === 0) return;
-    setPricesConfirmed(false);
+    setProductsSaved(false);
     await analyze(photos, "quick");
   };
 
   const handleFramesReady = async (base64Frames: string[]) => {
     setPhotos(base64Frames);
     setSelectedFrame(0);
-    setPricesConfirmed(false);
+    setProductsSaved(false);
     await analyze(base64Frames, "multi");
   };
 
   useEffect(() => {
     if (result) setLastResult(result);
   }, [result]);
-
-  // Auto-confirm prices if all products already have saved prices
-  useEffect(() => {
-    if (!result || pricesConfirmed) return;
-    const newProducts = result.items.filter(i => getPrice(i.name) === null);
-    if (newProducts.length === 0 && result.items.length > 0) {
-      // All prices known — auto-save
-      savePrices(result.items.map(i => ({
-        name: i.name,
-        sellPrice: getPrice(i.name)!,
-      })));
-      setPricesConfirmed(true);
-    }
-  }, [result, pricesConfirmed]);
 
   return (
     <div className="page">
@@ -137,9 +121,8 @@ export default function ScanPage() {
       {error && <div className="error-box">{error}</div>}
 
       {result && (() => {
-        // Use per-frame annotations when available, fallback to shared predictions
         const frameAnno = result.angleAnnotations?.[selectedFrame];
-        const framePreds = frameAnno?.predictions || result.predictions || [];
+        const framePreds = (frameAnno?.predictions?.length ? frameAnno.predictions : result.predictions) || [];
         const frameW = frameAnno?.imageWidth || result.imageWidth || 1024;
         const frameH = frameAnno?.imageHeight || result.imageHeight || 768;
         const frameImg = `data:image/jpeg;base64,${photos[selectedFrame] || photos[0]}`;
@@ -191,19 +174,17 @@ export default function ScanPage() {
             ocrLabels={result.ocr_texts.length}
           />
 
-          {result.depth_notes && (
-            <div className="depth-insight">
-              <strong>Depth insight:</strong> {result.depth_notes}
-            </div>
-          )}
-
           <ResultsList items={result.items} />
 
-          {/* Price confirmation — only show if there are new products */}
-          {!pricesConfirmed && result.items.length > 0 && (
-            <PriceConfirmation
+          {/* Product confirmation — onboarding + catalog building */}
+          {!productsSaved && result.items.length > 0 && (
+            <ProductConfirmation
               items={result.items}
-              onConfirm={() => setPricesConfirmed(true)}
+              predictions={result.predictions || []}
+              photoBase64={photos[0]}
+              imageWidth={result.imageWidth || 1024}
+              imageHeight={result.imageHeight || 768}
+              onSaved={() => setProductsSaved(true)}
             />
           )}
         </>

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { readLabelsFromImage } from "../services/geminiOCR";
 import { detectProducts, flattenDINOResults, cropBoxRegion } from "../services/groundingDinoAPI";
 import type { FlatPrediction, DINOResponse } from "../services/groundingDinoAPI";
 import { analyzeWithConsensus, analyzeSinglePhoto } from "../services/geminiMultiAngle";
@@ -47,7 +46,6 @@ function loadImage(base64: string): Promise<HTMLImageElement> {
   });
 }
 
-// Convert FlatPredictions (from Grounding DINO) into MergedPredictions for overlay
 function flatToMerged(flat: FlatPrediction[]): MergedPrediction[] {
   return flat.map((f) => ({
     polygon: f.polygon,
@@ -59,7 +57,6 @@ function flatToMerged(flat: FlatPrediction[]): MergedPrediction[] {
   }));
 }
 
-// Format DINO detections as text for Gemini context (single photo path)
 function formatDetectionResults(flat: FlatPrediction[]): string {
   if (flat.length === 0) return "No products detected by the detection system.";
 
@@ -86,69 +83,51 @@ export function useInventoryAnalysis() {
     setState({ loading: true, error: null, result: null });
 
     try {
-      // Get dimensions for all frames in parallel
       const allDims = await Promise.all(photos.map((p) => getImageDims(p)));
       const imgDims = allDims[0];
 
-      // ═══════════════════════════════════════════════════════════
-      // Step 1: Grounding DINO on ALL frames + OCR (in parallel)
-      // ═══════════════════════════════════════════════════════════
-      console.log("[COUNTR] Step 1: Grounding DINO on %d frames + OCR...", photos.length);
+      // Step 1: Grounding DINO on ALL frames (parallel)
+      console.log("[COUNTR] Step 1: DINO on %d frames (parallel)...", photos.length);
 
-      // Stagger DINO requests 250ms apart to avoid API rate limiting
-      const dinoStarted: Promise<DINOResponse | null>[] = [];
-      for (let i = 0; i < photos.length; i++) {
-        if (i > 0) await new Promise((r) => setTimeout(r, 250));
-        dinoStarted.push(
-          detectProducts(photos[i]).then(
+      const dinoResults: (DINOResponse | null)[] = await Promise.all(
+        photos.map((photo, i) =>
+          detectProducts(photo).then(
             (res) => { console.log("[COUNTR] DINO frame %d: %d predictions", i, res.predictions.length); return res; },
             (err) => { console.error("[COUNTR] DINO frame %d FAILED:", i, err); return null; },
           ),
-        );
-      }
+        ),
+      );
 
-      // OCR runs in parallel with the DINO calls
-      const [dinoResults, ocrSettled] = await Promise.all([
-        Promise.all(dinoStarted),
-        readLabelsFromImage(photos[0]).catch(() => [] as string[]),
-      ]);
-
-      const ocrTexts = ocrSettled;
-
-      // Flatten DINO results for each frame
       const perFrameFlat: FlatPrediction[][] = dinoResults.map((dr) =>
         dr ? flattenDINOResults(dr) : [],
       );
 
       const flatPredictions = perFrameFlat[0];
-      console.log("[COUNTR] DINO frame 0: %d boxes, total across frames: %d",
-        flatPredictions.length, perFrameFlat.reduce((s, f) => s + f.length, 0));
+      console.log("[COUNTR] DINO total boxes across frames: %d",
+        perFrameFlat.reduce((s, f) => s + f.length, 0));
 
-      // ═══════════════════════════════════════════════════════════
-      // Step 2: DINOv2 catalog matching on frame 0 box crops
-      // ═══════════════════════════════════════════════════════════
+      // Step 1b: DINOv2 catalog matching (only if catalog exists)
       const hasCatalog = getCatalog().length > 0;
 
       if (hasCatalog && flatPredictions.length > 0) {
-        console.log("[COUNTR] Step 2: DINOv2 catalog matching...");
+        console.log("[COUNTR] Catalog matching on %d boxes...", flatPredictions.length);
         const img = await loadImage(photos[0]);
 
-        const matchPromises = flatPredictions.map(async (pred) => {
-          try {
-            const blob = await cropBoxRegion(img, pred.box);
-            const match = await matchCatalog(blob);
-            if (match.name) {
-              pred.catalogMatch = match.name;
-              pred.catalogSimilarity = match.similarity;
-              pred.idMethod = "catalog";
+        await Promise.allSettled(
+          flatPredictions.map(async (pred) => {
+            try {
+              const blob = await cropBoxRegion(img, pred.box);
+              const match = await matchCatalog(blob);
+              if (match.name) {
+                pred.catalogMatch = match.name;
+                pred.catalogSimilarity = match.similarity;
+                pred.idMethod = "catalog";
+              }
+            } catch {
+              // keep DINO label
             }
-          } catch {
-            // Catalog match failed — keep DINO label
-          }
-        });
-
-        await Promise.allSettled(matchPromises);
-        console.log("[COUNTR] Catalog matching complete");
+          }),
+        );
       }
 
       let predictions = flatToMerged(flatPredictions);
@@ -156,70 +135,47 @@ export function useInventoryAnalysis() {
       let depthNotes = "";
 
       if (mode === "multi" && photos.length >= 2) {
-        // ═══════════════════════════════════════════════════════════
-        // Step 3: Consensus counting — DINO on all frames
-        // ═══════════════════════════════════════════════════════════
-        console.log("[COUNTR] Step 3: Building consensus from %d frames...", photos.length);
+        // Step 2: Consensus counting
+        console.log("[COUNTR] Step 2: Building consensus...");
 
         const frameDetections = buildFrameDetections(perFrameFlat, allDims);
         const consensus = computeConsensus(frameDetections, photos.length);
 
-        console.log("[COUNTR] Consensus: %s",
-          consensus.map(c => `${c.product}=${c.consensusCount}(${c.confidence})`).join(", "));
-
-        // ═══════════════════════════════════════════════════════════
-        // Step 4: Gemini consensus verification (all frames + consensus data)
-        // ═══════════════════════════════════════════════════════════
-        console.log("[COUNTR] Step 4: Gemini consensus verification...");
+        // Step 3: Gemini verification
+        console.log("[COUNTR] Step 3: Gemini verification...");
 
         const geminiResult = await analyzeWithConsensus(photos, consensus, frameDetections).catch((err) => {
-          console.error("[COUNTR] Gemini consensus verification failed:", err);
+          console.error("[COUNTR] Gemini failed:", err);
           return null;
         });
 
-        console.log("[COUNTR] Gemini consensus result:", geminiResult);
-
         items = mergeConsensus(geminiResult, consensus);
-        depthNotes = geminiResult?.depth_notes || "Multi-angle consensus counting";
+        depthNotes = geminiResult?.depth_notes || "";
       } else {
-        // ═══════════════════════════════════════════════════════════
-        // Single photo: Gemini counts visible items + price
-        // ═══════════════════════════════════════════════════════════
+        // Single photo
         console.log("[COUNTR] Single photo: Gemini counting...");
 
         const detectionContext = formatDetectionResults(flatPredictions);
         const geminiResult = await analyzeSinglePhoto(photos[0], detectionContext).catch(() => null);
         items = mergeSinglePhoto(predictions, geminiResult);
-        depthNotes = geminiResult?.note || "Single angle — take a side photo to see depth";
+        depthNotes = geminiResult?.note || "";
       }
 
-      // ═══════════════════════════════════════════════════════════
-      // Build per-frame angle annotations (each frame's own DINO boxes)
-      // ═══════════════════════════════════════════════════════════
-      const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => {
-        const framePreds = flatToMerged(perFrameFlat[i]);
-        return {
-          predictions: framePreds,
-          imageWidth: allDims[i].width,
-          imageHeight: allDims[i].height,
-          label: `Frame ${i + 1}`,
-        };
-      });
+      // Per-frame annotations
+      const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => ({
+        predictions: flatToMerged(perFrameFlat[i]),
+        imageWidth: allDims[i].width,
+        imageHeight: allDims[i].height,
+        label: `Frame ${i + 1}`,
+      }));
 
-      // Primary predictions = frame 0's annotations
       predictions = angleAnnotations[0].predictions;
-
-      console.log("[COUNTR] Per-frame boxes: %s",
-        angleAnnotations.map((a, i) => `frame${i}=${a.predictions.length}`).join(", "));
 
       const thumbnail = await makeThumbnail(photos[0]);
 
       const totalFront = items.reduce((sum, i) => sum + i.front_visible, 0);
       const totalDepth = items.reduce((sum, i) => sum + i.depth_visible, 0);
       const totalItems = items.reduce((sum, i) => sum + i.total, 0);
-
-      console.log("[COUNTR] Final: front=%d depth=%d total=%d",
-        totalFront, totalDepth, totalItems);
 
       const scan: ScanResult = {
         id: Date.now().toString(36),
@@ -228,7 +184,7 @@ export function useInventoryAnalysis() {
         total_front: totalFront,
         total_depth: totalDepth,
         total_items: totalItems,
-        ocr_texts: ocrTexts as string[],
+        ocr_texts: [],
         depth_notes: depthNotes,
         thumbnail,
         predictions,

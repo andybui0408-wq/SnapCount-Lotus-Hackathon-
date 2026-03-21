@@ -11,15 +11,9 @@ interface Props {
 }
 
 const MAX_DURATION = 10; // seconds
-const TARGET_FRAMES = 5;
-const TOTAL_CANDIDATES = 20;
-const CAPTURE_INTERVAL_MS = 500; // capture a frame every 500ms during recording
-
-const GUIDANCE: { start: number; end: number; text: string }[] = [
-  { start: 0, end: 3, text: "Face the shelf straight on" },
-  { start: 3, end: 7, text: "Slowly move to the side" },
-  { start: 7, end: 10, text: "Keep going for the other angle" },
-];
+const TARGET_FRAMES = 3;
+const TOTAL_CANDIDATES = 12;
+const CAPTURE_INTERVAL_MS = 500;
 
 export default function VideoCapture({ onFramesReady }: Props) {
   const [mode, setMode] = useState<CaptureMode>("idle");
@@ -35,15 +29,11 @@ export default function VideoCapture({ onFramesReady }: Props) {
   const timerRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Live frame capture during recording
   const captureTimerRef = useRef<number>(0);
   const capturedRef = useRef<LiveCapture[]>([]);
   const startTimeRef = useRef<number>(0);
-
-  // Prevent duplicate starts from overlapping touch/mouse events
   const isRecordingRef = useRef(false);
 
-  // Start camera preview
   const startCamera = useCallback(async () => {
     setError(null);
     try {
@@ -63,12 +53,10 @@ export default function VideoCapture({ onFramesReady }: Props) {
     }
   }, []);
 
-  // Auto-start camera on mount
   useEffect(() => {
     startCamera();
   }, [startCamera]);
 
-  // Stop camera stream
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -76,7 +64,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
     }
   }, []);
 
-  // Start recording — also begins live frame capture
   const startRecording = useCallback(() => {
     if (isRecordingRef.current) return;
     const stream = streamRef.current;
@@ -107,7 +94,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
       const blob = new Blob(chunksRef.current, { type: mimeType });
       stopCamera();
 
-      // Show recorded video playback
       if (videoRef.current) {
         videoRef.current.srcObject = null;
         videoRef.current.src = URL.createObjectURL(blob);
@@ -116,15 +102,11 @@ export default function VideoCapture({ onFramesReady }: Props) {
 
       setMode("recorded");
 
-      // Use frames captured DURING recording (instant, no blob extraction)
       const captures = capturedRef.current;
-      console.log("[VideoCapture] Live captures: %d frames", captures.length);
-
       if (captures.length >= 2) {
         const selected = selectBestFromCaptures(captures, TARGET_FRAMES);
         setFrames(selected);
       } else {
-        // Very short recording — just use what we have
         setFrames(captures.map((c) => ({
           ...c,
           blob: new Blob(),
@@ -135,12 +117,11 @@ export default function VideoCapture({ onFramesReady }: Props) {
     recorder.start();
     setMode("recording");
 
-    // Ensure video keeps playing during recording (mobile Safari may stop it)
+    // Keep video playing during recording (mobile Safari fix)
     if (videoRef.current) {
       videoRef.current.play().catch(() => {});
     }
 
-    // Timer
     const startTime = Date.now();
     startTimeRef.current = startTime;
     timerRef.current = window.setInterval(() => {
@@ -153,7 +134,7 @@ export default function VideoCapture({ onFramesReady }: Props) {
       }
     }, 100);
 
-    // Live frame capture — grab frames from the live video stream
+    // Live frame capture
     const captureCanvas = document.createElement("canvas");
     const captureCtx = captureCanvas.getContext("2d")!;
     let canvasReady = false;
@@ -162,7 +143,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
       const video = videoRef.current;
       if (!video || video.videoWidth === 0) return;
 
-      // Initialize canvas size on first valid frame
       if (!canvasReady) {
         const scale = Math.min(1, MAX_IMAGE_SIZE / Math.max(video.videoWidth, video.videoHeight));
         captureCanvas.width = Math.round(video.videoWidth * scale);
@@ -183,12 +163,11 @@ export default function VideoCapture({ onFramesReady }: Props) {
           sharpness,
         });
       } catch {
-        // Canvas draw can fail if video not ready yet
+        // Canvas draw can fail if video not ready
       }
     }, CAPTURE_INTERVAL_MS);
   }, [stopCamera]);
 
-  // Stop recording
   const stopRecording = useCallback(() => {
     clearInterval(timerRef.current);
     clearInterval(captureTimerRef.current);
@@ -197,7 +176,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
     }
   }, []);
 
-  // Extract best frames from uploaded video file (blob-based)
   const doExtractFrames = async (blob: Blob) => {
     setExtracting(true);
     setError(null);
@@ -210,7 +188,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
     setExtracting(false);
   };
 
-  // Handle file upload fallback
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -228,7 +205,6 @@ export default function VideoCapture({ onFramesReady }: Props) {
     await doExtractFrames(file);
   };
 
-  // Reset to initial state
   const handleReset = useCallback(() => {
     stopRecording();
     stopCamera();
@@ -241,17 +217,14 @@ export default function VideoCapture({ onFramesReady }: Props) {
     setElapsed(0);
     setFrames([]);
     setError(null);
-    // Re-open camera
     setTimeout(() => startCamera(), 100);
   }, [stopRecording, stopCamera, startCamera]);
 
-  // Analyze with extracted frames
   const handleAnalyze = () => {
     if (frames.length === 0) return;
     onFramesReady(frames.map((f) => f.base64));
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCamera();
@@ -260,20 +233,9 @@ export default function VideoCapture({ onFramesReady }: Props) {
     };
   }, [stopCamera]);
 
-  // Get current guidance text
-  const guidanceText = GUIDANCE.find((g) => elapsed >= g.start && elapsed < g.end)?.text || "";
-
-  // Timer progress for the ring
-  const progress = Math.min(elapsed / MAX_DURATION, 1);
-  const circumference = 2 * Math.PI * 34; // radius 34
-  const dashOffset = circumference * (1 - progress);
-
-  // Compute max sharpness for normalizing bars
-  const maxSharpness = frames.length > 0 ? Math.max(...frames.map((f) => f.sharpness)) : 1;
-
   return (
     <div className="video-capture">
-      {/* Viewfinder */}
+      {/* Viewfinder — fixed size, shows live camera */}
       <div className="vc-viewfinder">
         <video
           ref={videoRef}
@@ -292,40 +254,20 @@ export default function VideoCapture({ onFramesReady }: Props) {
           </div>
         )}
 
-        {/* Recording overlay — large centered timer */}
+        {/* Minimal recording indicator — just REC badge, video stays visible */}
         {mode === "recording" && (
           <div className="vc-recording-overlay">
-            <div className="vc-timer-center">
-              <svg className="vc-timer-ring" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
-                <circle
-                  cx="40" cy="40" r="34"
-                  fill="none"
-                  stroke="#ef4444"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={dashOffset}
-                  transform="rotate(-90 40 40)"
-                />
-              </svg>
-              <div className="vc-timer-text">
-                <span className="vc-timer-seconds">{Math.floor(elapsed)}</span>
-                <span className="vc-timer-unit">s</span>
-              </div>
-            </div>
             <div className="vc-rec-badge">
               <span className="vc-rec-dot" />
-              REC
+              REC {Math.floor(elapsed)}s
             </div>
-            {guidanceText && <div className="vc-guidance">{guidanceText}</div>}
           </div>
         )}
 
         {extracting && (
           <div className="vc-extracting-overlay">
             <div className="spinner" />
-            <span>Selecting sharpest frames...</span>
+            <span>Selecting best frames...</span>
           </div>
         )}
       </div>
@@ -384,31 +326,21 @@ export default function VideoCapture({ onFramesReady }: Props) {
 
       {error && <div className="error-box">{error}</div>}
 
-      {/* Extracted frames preview */}
+      {/* Captured frames preview */}
       {frames.length > 0 && (
         <div className="vc-frames">
           <p className="text-secondary" style={{ fontSize: 12 }}>
-            Selected {frames.length} sharpest frames
+            {frames.length} frames captured
           </p>
-          <div className="vc-frame-grid-5">
-            {frames.map((f, i) => {
-              const pct = maxSharpness > 0 ? (f.sharpness / maxSharpness) * 100 : 100;
-              const barColor = pct > 70 ? "var(--black)" : "var(--stone)";
-              return (
-                <div key={i} className="vc-frame-thumb">
-                  <img src={f.dataUrl} alt={`Frame ${i + 1}`} />
-                  <div className="vc-sharpness-bar">
-                    <div
-                      className="vc-sharpness-fill"
-                      style={{ width: `${pct}%`, background: barColor }}
-                    />
-                  </div>
-                  <span className="vc-frame-label">
-                    {f.timestamp.toFixed(1)}s
-                  </span>
-                </div>
-              );
-            })}
+          <div className="vc-frame-grid-3">
+            {frames.map((f, i) => (
+              <div key={i} className="vc-frame-thumb">
+                <img src={f.dataUrl} alt={`Frame ${i + 1}`} />
+                <span className="vc-frame-label">
+                  {f.timestamp.toFixed(1)}s
+                </span>
+              </div>
+            ))}
           </div>
           <button
             className="btn btn-primary btn-large"

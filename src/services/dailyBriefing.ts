@@ -9,12 +9,7 @@ interface BriefingCache {
   timestamp: number;
 }
 
-const VIETNAMESE_WEEKDAYS = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
-
-function formatViDate(d: Date): string {
-  const weekday = VIETNAMESE_WEEKDAYS[d.getDay()];
-  return `${weekday} ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
-}
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export async function getDailyBriefing(): Promise<string> {
   // Check cache
@@ -25,47 +20,37 @@ export async function getDailyBriefing(): Promise<string> {
   }
 
   const snapshots = getSnapshots().slice(-7);
-  if (snapshots.length < 2) return "Chưa có đủ dữ liệu. Quét hàng tồn kho để bắt đầu theo dõi.";
+  if (snapshots.length < 2) return "Not enough data yet. Scan your inventory to start tracking.";
 
   const depletion = getDepletionData();
-  if (depletion.length === 0) return "Chưa có dữ liệu xu hướng.";
+  if (depletion.length === 0) return "No trend data available.";
 
-  // Build inventory data string
+  // Build concise inventory summary
+  const critical = depletion.filter(d => d.status === "critical");
+  const low = depletion.filter(d => d.status === "low");
+
   const inventoryLines = depletion.map(
-    (d) => `${d.name}: còn ${d.currentStock}, tiêu thụ ${d.avgPerDay}/ngày, còn ~${d.daysLeft} ngày`,
+    (d) => `${d.name}: ${d.currentStock} left, ${d.avgPerDay}/day, ~${d.daysLeft} days remaining`,
   );
 
-  // Build trend data string
-  const trendLines = depletion.map((d) => {
-    const values = snapshots.map((s) => s.products[d.name] ?? 0);
-    return `${d.name}: [${values.join(", ")}]`;
-  });
+  const today = new Date();
+  const dateStr = `${WEEKDAYS[today.getDay()]}, ${today.getMonth() + 1}/${today.getDate()}`;
 
-  const today = formatViDate(new Date());
+  const prompt = `You are a concise inventory assistant. Today: ${dateStr}.
 
-  const prompt = `You are an AI inventory assistant for a Vietnamese convenience store owner. Speak to them directly in Vietnamese, warmly and conversationally — like a trusted employee giving a morning report.
-
-Here is their current inventory data:
+Stock data:
 ${inventoryLines.join("\n")}
 
-Here are the 7-day stock trends (product: [day1, day2, ..., today]):
-${trendLines.join("\n")}
+${critical.length > 0 ? `CRITICAL (≤1 day): ${critical.map(d => d.name).join(", ")}` : ""}
+${low.length > 0 ? `LOW (≤3 days): ${low.map(d => d.name).join(", ")}` : ""}
 
-Today's date: ${today}
-
-Write a SHORT briefing (3-5 sentences max) in Vietnamese that tells them:
-1. What's running out FIRST — name the products and how many are left
-2. Which product is selling the FASTEST this week
-3. A specific action deadline: "Đặt hàng trước [weekday] nếu không [day] sẽ hết [product]"
-   Calculate the actual day it will run out based on the daily consumption rate.
-
-Rules:
-- Write in casual Vietnamese (use "anh/chị ơi" or "anh ơi")
-- Use real product names from the data
-- Be specific with numbers: "còn 3 lon" not "sắp hết"
-- Include the ORDER DEADLINE — the day they must order by (run-out date minus 1 day for delivery)
-- Keep it under 5 sentences. No bullet points. Just flowing text like a person talking.
-- Do NOT include any JSON or markdown formatting.`;
+Write a brief inventory alert in 2-3 short sentences:
+- Start with any URGENT warnings (items running out within 1-2 days)
+- State exactly when to restock (specific day)
+- Keep it direct and actionable — no greetings, no filler
+- Use format: "⚠️ [Product]: [X] left, restock by [day]." for critical items
+- End with one line on fastest-selling item this week
+- Plain text only, no markdown`;
 
   const text = await callGemini([{ role: "user", content: prompt }]);
 

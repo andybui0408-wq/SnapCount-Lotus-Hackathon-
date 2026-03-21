@@ -1,7 +1,7 @@
 import { CATALOG_SIMILARITY_THRESHOLD } from "../constants/config";
 import { getEmbedding } from "./dinov2API";
 
-const CATALOG_KEY = "snapcount_catalog";
+const CATALOG_KEY = "countr_catalog";
 
 export interface CatalogProduct {
   name: string;

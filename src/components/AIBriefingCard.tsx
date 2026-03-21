@@ -8,7 +8,7 @@ export default function AIBriefingCard() {
   useEffect(() => {
     getDailyBriefing()
       .then(setText)
-      .catch(() => setText("Không thể tải briefing. Thử lại sau."))
+      .catch(() => setText("Could not load briefing. Try again later."))
       .finally(() => setLoading(false));
   }, []);
 

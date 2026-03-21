@@ -29,7 +29,16 @@ export interface FlatPrediction {
 
 // ── Vocabulary management ────────────────────────────────────────
 
-let currentVocabulary: string[] = [...DEFAULT_VOCABULARY];
+const VOCAB_KEY = "countr_vocabulary";
+
+function loadCustomVocabulary(): string[] | null {
+  const raw = localStorage.getItem(VOCAB_KEY);
+  if (!raw) return null;
+  const names: string[] = JSON.parse(raw);
+  return names.length > 0 ? names : null;
+}
+
+let currentVocabulary: string[] = loadCustomVocabulary() || [...DEFAULT_VOCABULARY];
 
 export function setVocabulary(vocab: string[]) {
   currentVocabulary = [...vocab];
@@ -37,6 +46,21 @@ export function setVocabulary(vocab: string[]) {
 
 export function getVocabulary(): string[] {
   return [...currentVocabulary];
+}
+
+export function saveCustomVocabulary(names: string[]) {
+  const existing = loadCustomVocabulary() || [];
+  const merged = [...new Set([...existing, ...names])];
+  localStorage.setItem(VOCAB_KEY, JSON.stringify(merged));
+  currentVocabulary = merged;
+}
+
+export function hasCustomVocabulary(): boolean {
+  return loadCustomVocabulary() !== null;
+}
+
+export function reloadVocabulary() {
+  currentVocabulary = loadCustomVocabulary() || [...DEFAULT_VOCABULARY];
 }
 
 // ── NMS (Non-Maximum Suppression) ────────────────────────────────
