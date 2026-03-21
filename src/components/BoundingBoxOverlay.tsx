@@ -45,6 +45,9 @@ export default function BoundingBoxOverlay({ imageSrc, predictions, imageWidth, 
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
 
+      console.log("[BBoxOverlay] img=%dx%d, props=%dx%d, predictions=%d",
+        img.width, img.height, imageWidth, imageHeight, predictions.length);
+
       const scaleX = img.width / imageWidth;
       const scaleY = img.height / imageHeight;
       const lineW = Math.max(2, Math.round(img.width / 400));
@@ -69,30 +72,47 @@ export default function BoundingBoxOverlay({ imageSrc, predictions, imageWidth, 
         }
       }
 
-      for (const pred of predictions) {
-        // x, y = top-left corner; width, height = dimensions
-        const x = pred.x * scaleX;
-        const y = pred.y * scaleY;
-        const w = pred.width * scaleX;
-        const h = pred.height * scaleY;
+      for (let pi = 0; pi < predictions.length; pi++) {
+        const pred = predictions[pi];
+        const pts = pred.polygon;
+        if (!pts || pts.length < 3) {
+          console.warn("[BBoxOverlay] skip pred %d: pts=%o", pi, pts);
+          continue;
+        }
+
+        // Scale polygon points
+        const scaled = pts.map(([px, py]) => [px * scaleX, py * scaleY]);
+        if (pi < 3) console.log("[BBoxOverlay] pred %d '%s': pts=%o scaled=%o", pi, pred.class, pts, scaled);
 
         const color = labelColors.get(pred.class.toLowerCase()) || GROUP_COLORS[0];
         const count = countMap.get(pred.class.toLowerCase());
         const displayName = pred.class.length > 25 ? pred.class.slice(0, 25) + "…" : pred.class;
         const label = count ? `${displayName} ×${count}` : displayName;
 
-        // Semi-transparent fill
-        ctx.fillStyle = hexToRgba(color, 0.12);
-        ctx.fillRect(x, y, w, h);
+        // Draw polygon path
+        ctx.beginPath();
+        ctx.moveTo(scaled[0][0], scaled[0][1]);
+        for (let i = 1; i < scaled.length; i++) {
+          ctx.lineTo(scaled[i][0], scaled[i][1]);
+        }
+        ctx.closePath();
 
-        // Dashed border for group region
+        // Semi-transparent fill
+        ctx.fillStyle = hexToRgba(color, 0.15);
+        ctx.fill();
+
+        // Dashed polygon border
         ctx.strokeStyle = color;
         ctx.lineWidth = lineW;
         ctx.setLineDash([lineW * 3, lineW * 2]);
-        ctx.strokeRect(x, y, w, h);
+        ctx.stroke();
         ctx.setLineDash([]);
 
-        // Label background (pill at top-left inside the box)
+        // Find top-left point for label placement
+        const minX = Math.min(...scaled.map((p) => p[0]));
+        const minY = Math.min(...scaled.map((p) => p[1]));
+
+        // Label background pill
         ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
         const tm = ctx.measureText(label);
         const padX = Math.round(fontSize * 0.45);
@@ -100,10 +120,10 @@ export default function BoundingBoxOverlay({ imageSrc, predictions, imageWidth, 
         const labelH = fontSize + padY * 2;
         const labelW = tm.width + padX * 2;
 
-        const labelX = x + lineW;
-        const labelY = y + lineW;
+        const labelX = minX + lineW;
+        const labelY = minY + lineW;
 
-        // Rounded rectangle
+        // Rounded rectangle background
         const r = Math.round(fontSize * 0.25);
         ctx.fillStyle = hexToRgba(color, 0.92);
         ctx.beginPath();

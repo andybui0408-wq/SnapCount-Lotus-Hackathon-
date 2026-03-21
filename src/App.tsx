@@ -1,43 +1,28 @@
 import { useState } from "react";
+import HomePage from "./pages/HomePage";
 import ScanPage from "./pages/ScanPage";
 import DashboardPage from "./pages/DashboardPage";
 import RestockPage from "./pages/RestockPage";
 import HistoryPage from "./pages/HistoryPage";
+import ProfilePage from "./pages/ProfilePage";
+import BottomTabBar from "./components/BottomTabBar";
 import type { TabId } from "./types";
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "scan", label: "Scan" },
-  { id: "dashboard", label: "Dashboard" },
-  { id: "restock", label: "Restock" },
-  { id: "history", label: "History" },
-];
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>("scan");
+  const [activeTab, setActiveTab] = useState<TabId>("home");
 
   return (
-    <div className="app">
-      <nav className="tab-nav">
-        <div className="nav-brand">SnapCount</div>
-        <div className="tab-list">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              className={`tab-btn ${activeTab === tab.id ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      <main className="main-content">
-        {activeTab === "scan" && <ScanPage />}
+    <div className="app-shell">
+      <div className="app-content">
+        {activeTab === "home" && <HomePage onTabChange={setActiveTab} />}
         {activeTab === "dashboard" && <DashboardPage />}
+        {activeTab === "scan" && <ScanPage />}
         {activeTab === "restock" && <RestockPage />}
         {activeTab === "history" && <HistoryPage />}
-      </main>
+        {activeTab === "profile" && <ProfilePage />}
+      </div>
+
+      <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }

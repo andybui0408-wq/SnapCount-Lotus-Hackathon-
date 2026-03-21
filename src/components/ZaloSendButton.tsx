@@ -18,10 +18,10 @@ export default function ZaloSendButton({ message, phone }: Props) {
   return (
     <div className="zalo-actions">
       <button className="btn btn-secondary" onClick={handleCopy}>
-        {copied ? "Đã copy!" : "Copy tin nhắn"}
+        {copied ? "Copied!" : "Copy Message"}
       </button>
-      <button className="btn btn-primary" onClick={() => openZaloLink(phone)}>
-        Gửi qua Zalo
+      <button className="btn btn-primary" style={{ width: "auto", padding: "10px 20px" }} onClick={() => openZaloLink(phone)}>
+        Send via Zalo
       </button>
     </div>
   );

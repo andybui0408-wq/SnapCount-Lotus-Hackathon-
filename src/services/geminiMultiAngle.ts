@@ -1,96 +1,84 @@
-import { PER_ANGLE_PROMPT, SINGLE_PHOTO_PROMPT, RECONCILE_PROMPT } from "../constants/config";
+import { SINGLE_PHOTO_PROMPT } from "../constants/config";
 import { callGeminiJSON } from "./geminiAPI";
 
-// ── Shared bbox type ─────────────────────────────────────────────
-
-export interface BboxEntry {
-  label: string;
-  box: [number, number, number, number]; // [x_min, y_min, x_max, y_max]
-}
-
-// ── Per-angle result (Step 1) ────────────────────────────────────
-
-export interface PerAngleProduct {
-  product: string;
-  count: number;
-}
-
-export interface PerAngleResult {
-  products: PerAngleProduct[];
-  bboxes?: BboxEntry[];
-  total_items: number;
-  image_width?: number;
-  image_height?: number;
-}
-
-// ── Reconciled result (Step 2 / final) ───────────────────────────
+// ── Multi-angle result ───────────────────────────────────────────
 
 export interface MultiAngleProduct {
   product: string;
   front_visible: number;
   depth_visible: number;
   total: number;
+  boxes?: number[][];
   notes: string;
 }
 
 export interface MultiAngleResult {
   products: MultiAngleProduct[];
-  bboxes?: BboxEntry[];
   total_items: number;
   angles_used: number;
   depth_notes: string;
-  image_width?: number;
-  image_height?: number;
 }
 
-// ── Single photo types ───────────────────────────────────────────
+// ── Single photo result ──────────────────────────────────────────
 
 export interface SinglePhotoProduct {
   product: string;
   visible_count: number;
+  boxes?: number[][];
   notes: string;
 }
 
 export interface SinglePhotoResult {
   products: SinglePhotoProduct[];
-  bboxes?: BboxEntry[];
   total_items: number;
   note: string;
-  image_width?: number;
-  image_height?: number;
 }
 
-// ── Step 1: Count each angle independently ───────────────────────
+// ── Build dynamic multi-angle prompt for variable frame count ────
 
-export async function countSingleAngle(base64Image: string): Promise<PerAngleResult> {
-  return callGeminiJSON<PerAngleResult>([
-    {
-      role: "user",
-      content: [
-        { type: "text", text: PER_ANGLE_PROMPT },
-        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
-      ],
-    },
-  ]);
+function buildMultiAnglePrompt(frameCount: number, detectionResults: string): string {
+  const photoList = Array.from({ length: frameCount }, (_, i) =>
+    `- Photo ${i + 1}: ${i === 0 ? "front/initial view" : `angle ${i} (different perspective)`}`,
+  ).join("\n");
+
+  return `You are counting inventory on a Vietnamese convenience store shelf.
+
+You have been given ${frameCount} photos of the SAME shelf taken from different angles during a walkthrough video.
+${photoList}
+
+The detection system has already identified these products from the first photo:
+${detectionResults}
+
+Using ALL the angled photos, count what you can actually SEE across all views combined.
+Do not guess or estimate — only count items visible in at least one photo.
+More photos from more angles means you can see deeper into the shelves.
+
+For each product, report:
+- product: name
+- front_visible: count from the front/first photo
+- depth_visible: additional items visible from other angles
+- total: front_visible + depth_visible
+- boxes: array of bounding boxes [ymin, xmin, ymax, xmax] normalized 0-1000 (where 0,0=top-left, 1000,1000=bottom-right). Include one box per visible group in the FIRST photo.
+- notes: what the extra angles revealed
+
+Return ONLY valid JSON, no markdown:
+{
+  "products": [
+    { "product": "Coca-Cola can", "front_visible": 5, "depth_visible": 8, "total": 13, "boxes": [[120, 340, 250, 450]], "notes": "angled views show 2 rows behind front" }
+  ],
+  "total_items": 42,
+  "angles_used": ${frameCount},
+  "depth_notes": "Multiple angles revealed depth on drink shelves"
+}`;
 }
 
-// ── Step 2: Reconcile all per-angle counts ───────────────────────
+// ── Multi-angle: ALL photos + detection results → Gemini ─────────
 
-export async function reconcileAngles(
+export async function analyzeMultiAngle(
   base64Images: string[],
-  perAngleResults: PerAngleResult[]
+  detectionResults: string,
 ): Promise<MultiAngleResult> {
-  const anglesSummary = perAngleResults
-    .map((r, i) => {
-      const label = i === 0 ? "Front" : i === 1 ? "Side" : `Angle ${i + 1}`;
-      const items = r.products.map((p) => `  - ${p.product}: ${p.count}`).join("\n");
-      return `Angle ${i + 1} (${label}) — ${r.total_items} total:\n${items}`;
-    })
-    .join("\n\n");
-
-  const prompt = RECONCILE_PROMPT
-    .replace("{NUM_ANGLES}", String(base64Images.length))
-    .replace("{PER_ANGLE_RESULTS}", anglesSummary);
+  const prompt = buildMultiAnglePrompt(base64Images.length, detectionResults);
 
   const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
     { type: "text", text: prompt },
@@ -106,11 +94,11 @@ export async function reconcileAngles(
   return callGeminiJSON<MultiAngleResult>([{ role: "user", content }]);
 }
 
-// ── Single photo ─────────────────────────────────────────────────
+// ── Single photo: 1 photo + detection results → Gemini ───────────
 
 export async function analyzeSinglePhoto(
   base64Image: string,
-  detectionResults: string
+  detectionResults: string,
 ): Promise<SinglePhotoResult> {
   const prompt = SINGLE_PHOTO_PROMPT.replace("{DETECTION_RESULTS}", detectionResults);
 

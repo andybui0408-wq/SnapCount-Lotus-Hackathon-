@@ -20,14 +20,14 @@ export default function RestockPage() {
 
   return (
     <div className="page">
-      <h1>Restock Order</h1>
+      <h1>Restock</h1>
 
       {stage === "idle" && (
         <div className="center-content">
           <p className="text-secondary">
             Generate an AI-powered purchase order based on your stock levels.
           </p>
-          <button className="btn btn-primary btn-large" onClick={generate}>
+          <button className="btn btn-primary" onClick={generate}>
             Generate Order
           </button>
           {error && <div className="error-box">{error}</div>}
@@ -66,7 +66,7 @@ export default function RestockPage() {
 
           <div className="order-actions">
             <button className="btn btn-ghost" onClick={reset}>Cancel</button>
-            <button className="btn btn-primary" onClick={confirm}>Confirm Order</button>
+            <button className="btn btn-primary" style={{ width: "auto", padding: "10px 24px" }} onClick={confirm}>Confirm Order</button>
           </div>
         </>
       )}

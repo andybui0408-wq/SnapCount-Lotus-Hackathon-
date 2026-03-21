@@ -2,7 +2,7 @@ import type { MergedItem } from "../types";
 
 const METHOD_BADGE: Record<string, { label: string; className: string }> = {
   catalog: { label: "Catalog", className: "badge-green" },
-  "grounding-dino": { label: "DINO", className: "badge-blue" },
+  dino: { label: "DINO", className: "badge-blue" },
   gemini: { label: "Gemini", className: "badge-purple" },
   unmatched: { label: "Unknown", className: "badge-amber" },
 };

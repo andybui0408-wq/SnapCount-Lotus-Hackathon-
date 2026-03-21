@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { readLabelsFromImage } from "../services/geminiOCR";
-import { countSingleAngle, reconcileAngles, analyzeSinglePhoto } from "../services/geminiMultiAngle";
-import type { MultiAngleResult, SinglePhotoResult, PerAngleResult, BboxEntry } from "../services/geminiMultiAngle";
-import { mergeSinglePhoto } from "../services/mergeResults";
+import { detectProducts, flattenDINOResults, cropBoxRegion } from "../services/groundingDinoAPI";
+import type { FlatPrediction } from "../services/groundingDinoAPI";
+import { analyzeMultiAngle, analyzeSinglePhoto } from "../services/geminiMultiAngle";
+import { matchCatalog, getCatalog } from "../services/productCatalog";
+import { mergeMultiAngle, mergeSinglePhoto } from "../services/mergeResults";
 import { saveScan } from "../services/scanHistory";
-import type { ScanResult, MergedPrediction, MergedItem, AngleAnnotation } from "../types";
+import type { ScanResult, MergedPrediction, MergedItem } from "../types";
 import { THUMBNAIL_SIZE, THUMBNAIL_QUALITY } from "../constants/config";
 
 interface AnalysisState {
@@ -36,33 +38,69 @@ function getImageDims(base64: string): Promise<{ width: number; height: number }
   });
 }
 
-// Convert Gemini's bboxes array into MergedPredictions for canvas drawing
-// Gemini returns [x_min, y_min, x_max, y_max] format
-function bboxesToPredictions(
-  bboxes: BboxEntry[] | undefined,
-  geminiW: number,
-  geminiH: number,
-  actualW: number,
-  actualH: number,
-): MergedPrediction[] {
-  if (!bboxes || bboxes.length === 0) return [];
+function loadImage(base64: string): Promise<HTMLImageElement> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.src = `data:image/jpeg;base64,${base64}`;
+  });
+}
 
-  const scaleX = actualW / (geminiW || actualW);
-  const scaleY = actualH / (geminiH || actualH);
-
-  return bboxes.map((b) => ({
-    // box is [x_min, y_min, x_max, y_max]
-    x: b.box[0] * scaleX,
-    y: b.box[1] * scaleY,
-    width: (b.box[2] - b.box[0]) * scaleX,
-    height: (b.box[3] - b.box[1]) * scaleY,
-    confidence: 1.0,
-    class: b.label,
-    dino_label: b.label,
-    catalog_match: null,
-    catalog_similarity: 0,
-    id_method: "grounding-dino" as const,
+// Convert FlatPredictions (from Grounding DINO) into MergedPredictions for overlay
+function flatToMerged(flat: FlatPrediction[]): MergedPrediction[] {
+  return flat.map((f) => ({
+    polygon: f.polygon,
+    confidence: f.confidence,
+    class: f.class,
+    catalog_match: f.catalogMatch || null,
+    catalog_similarity: f.catalogSimilarity || 0,
+    id_method: (f.idMethod === "catalog" ? "catalog" : f.idMethod === "dino" ? "dino" : "unmatched") as MergedPrediction["id_method"],
   }));
+}
+
+// Convert Gemini bounding boxes (normalized 0-1000) to MergedPredictions
+function geminiBboxToPredictions(
+  products: Array<{ product: string; boxes?: number[][] }>,
+  imageWidth: number,
+  imageHeight: number,
+): MergedPrediction[] {
+  const preds: MergedPrediction[] = [];
+  for (const gp of products) {
+    if (!gp.boxes || !Array.isArray(gp.boxes)) continue;
+    for (const box of gp.boxes) {
+      if (!Array.isArray(box) || box.length < 4) continue;
+      const [ymin, xmin, ymax, xmax] = box;
+      const x1 = (xmin / 1000) * imageWidth;
+      const y1 = (ymin / 1000) * imageHeight;
+      const x2 = (xmax / 1000) * imageWidth;
+      const y2 = (ymax / 1000) * imageHeight;
+      preds.push({
+        polygon: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]],
+        confidence: 1.0,
+        class: gp.product,
+        catalog_match: null,
+        catalog_similarity: 0,
+        id_method: "dino",
+      });
+    }
+  }
+  return preds;
+}
+
+// Format DINO detections as text for Gemini context
+function formatDetectionResults(flat: FlatPrediction[]): string {
+  if (flat.length === 0) return "No products detected by the detection system.";
+
+  const counts = new Map<string, number>();
+  for (const f of flat) {
+    const name = f.catalogMatch || f.class;
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+
+  const lines = Array.from(counts.entries()).map(
+    ([name, count]) => `- ${name}: ${count} instance${count > 1 ? "s" : ""} detected`,
+  );
+  return lines.join("\n");
 }
 
 export function useInventoryAnalysis() {
@@ -78,146 +116,132 @@ export function useInventoryAnalysis() {
     try {
       const imgDims = await getImageDims(photos[0]);
 
-      // OCR runs in parallel with everything else
-      const ocrPromise = readLabelsFromImage(photos[0]).catch(() => [] as string[]);
+      // ═══════════════════════════════════════════════════════════
+      // Step 1: Grounding DINO detection + OCR (in parallel)
+      // ═══════════════════════════════════════════════════════════
+      console.log("[COUNTR] Step 1: Grounding DINO + OCR on Photo 1...");
+
+      const settled = await Promise.allSettled([
+        detectProducts(photos[0]),
+        readLabelsFromImage(photos[0]),
+      ]);
+
+      let dinoResult = null;
+      let dinoError = "";
+      if (settled[0].status === "fulfilled") {
+        dinoResult = settled[0].value;
+        console.log("[COUNTR] DINO raw response: %d predictions, image=%dx%d",
+          dinoResult.predictions.length, dinoResult.image?.width, dinoResult.image?.height);
+      } else {
+        dinoError = settled[0].reason instanceof Error ? settled[0].reason.message : String(settled[0].reason);
+        console.error("[COUNTR] DINO FAILED:", dinoError);
+      }
+
+      const ocrTexts = settled[1].status === "fulfilled" ? settled[1].value : [] as string[];
+      if (settled[1].status === "rejected") {
+        console.error("[COUNTR] OCR FAILED:", settled[1].reason);
+      }
+
+      // Flatten DINO results (bounding boxes → polygon format)
+      const flatPredictions: FlatPrediction[] = dinoResult
+        ? flattenDINOResults(dinoResult)
+        : [];
+
+      console.log("[COUNTR] DINO found %d boxes", flatPredictions.length);
+
+      // ═══════════════════════════════════════════════════════════
+      // Step 2: DINOv2 catalog matching on each box crop
+      // ═══════════════════════════════════════════════════════════
+      const hasCatalog = getCatalog().length > 0;
+
+      if (hasCatalog && flatPredictions.length > 0) {
+        console.log("[COUNTR] Step 2: DINOv2 catalog matching...");
+        const img = await loadImage(photos[0]);
+
+        const matchPromises = flatPredictions.map(async (pred) => {
+          try {
+            const blob = await cropBoxRegion(img, pred.box);
+            const match = await matchCatalog(blob);
+            if (match.name) {
+              pred.catalogMatch = match.name;
+              pred.catalogSimilarity = match.similarity;
+              pred.idMethod = "catalog";
+            }
+          } catch {
+            // Catalog match failed — keep DINO label
+          }
+        });
+
+        await Promise.allSettled(matchPromises);
+        console.log("[COUNTR] Catalog matching complete");
+      }
+
+      // Build detection context for Gemini
+      const detectionContext = formatDetectionResults(flatPredictions);
+      let predictions = flatToMerged(flatPredictions);
 
       let items: MergedItem[];
       let depthNotes = "";
-      let predictions: MergedPrediction[] = [];
-      let angleAnnotations: AngleAnnotation[] = [];
+
+      let geminiProducts: Array<{ product: string; boxes?: number[][] }> = [];
 
       if (mode === "multi" && photos.length >= 2) {
         // ═══════════════════════════════════════════════════════════
-        // MULTI-ANGLE PIPELINE: Per-angle → Reconcile
+        // Step 3: Gemini multi-angle depth reasoning (single call)
         // ═══════════════════════════════════════════════════════════
+        console.log("[COUNTR] Step 3: Gemini multi-angle reasoning...");
 
-        // Step 1: Count each angle independently (in parallel)
-        console.log("[SnapCount] Step 1: Counting each angle independently...");
-        const perAnglePromises = photos.map((photo) =>
-          countSingleAngle(photo).catch(() => null)
-        );
-        const perAngleSettled = await Promise.all(perAnglePromises);
-        const perAngleResults: PerAngleResult[] = perAngleSettled.filter(
-          (r): r is PerAngleResult => r !== null
-        );
+        const geminiResult = await analyzeMultiAngle(photos, detectionContext).catch(() => null);
 
-        console.log("[SnapCount] Per-angle results:", perAngleResults.map((r, i) => ({
-          angle: i + 1,
-          total: r.total_items,
-          products: r.products.map((p) => `${p.product}: ${p.count}`),
-          bboxCount: r.bboxes?.length ?? 0,
-        })));
+        console.log("[COUNTR] Gemini multi-angle result:", geminiResult);
 
-        // Build per-angle annotations for all photos
-        const angleLabels = ["Front", "Side", "Top"];
-        const allDimsPromises = photos.map((p) => getImageDims(p));
-        const allDims = await Promise.all(allDimsPromises);
-
-        // Map settled results back to original photo indices
-        for (let i = 0; i < photos.length; i++) {
-          const r = perAngleSettled[i];
-          if (r !== null) {
-            const dims = allDims[i];
-            const preds = bboxesToPredictions(
-              r.bboxes,
-              r.image_width || dims.width,
-              r.image_height || dims.height,
-              dims.width, dims.height,
-            );
-            angleAnnotations.push({
-              predictions: preds,
-              imageWidth: dims.width,
-              imageHeight: dims.height,
-              label: angleLabels[i] || `Angle ${i + 1}`,
-            });
-          }
-        }
-
-        // Step 2: Reconcile across all angles
-        console.log("[SnapCount] Step 2: Reconciling across angles...");
-        let reconciled: MultiAngleResult | null = null;
-
-        if (perAngleResults.length >= 2) {
-          reconciled = await reconcileAngles(photos, perAngleResults).catch(() => null);
-        }
-
-        console.log("[SnapCount] Reconciled result:", reconciled);
-
-        if (reconciled) {
-          items = reconciled.products.map((p) => ({
-            name: p.product,
-            front_visible: p.front_visible,
-            depth_visible: p.depth_visible,
-            total: p.total,
-            id_method: "gemini" as const,
-            notes: p.notes,
+        if (geminiResult) {
+          items = mergeMultiAngle(predictions, geminiResult);
+          depthNotes = geminiResult.depth_notes || "";
+          geminiProducts = (geminiResult.products || []).map((p) => ({
+            product: p.product,
+            boxes: p.boxes,
           }));
-          depthNotes = reconciled.depth_notes || "";
-
-          // Use reconciled bboxes (Photo 1 coordinates)
-          predictions = bboxesToPredictions(
-            reconciled.bboxes,
-            reconciled.image_width || imgDims.width,
-            reconciled.image_height || imgDims.height,
-            imgDims.width, imgDims.height,
-          );
-
-          // Fallback: if reconciliation didn't return bboxes, use front angle's
-          if (predictions.length === 0 && perAngleResults[0]?.bboxes) {
-            predictions = bboxesToPredictions(
-              perAngleResults[0].bboxes,
-              perAngleResults[0].image_width || imgDims.width,
-              perAngleResults[0].image_height || imgDims.height,
-              imgDims.width, imgDims.height,
-            );
-          }
-        } else if (perAngleResults.length > 0) {
-          // Fallback: use the front angle's count if reconciliation failed
-          const front = perAngleResults[0];
-          items = front.products.map((p) => ({
-            name: p.product,
-            front_visible: p.count,
-            depth_visible: 0,
-            total: p.count,
-            id_method: "gemini" as const,
-          }));
-          depthNotes = "Reconciliation failed — showing front angle count only";
-          predictions = bboxesToPredictions(
-            front.bboxes,
-            front.image_width || imgDims.width,
-            front.image_height || imgDims.height,
-            imgDims.width, imgDims.height,
-          );
         } else {
-          items = [];
-          depthNotes = "All angle analyses failed";
+          items = mergeMultiAngle(predictions, null);
+          depthNotes = "Gemini depth reasoning failed — showing detection counts only";
         }
       } else {
         // ═══════════════════════════════════════════════════════════
-        // SINGLE PHOTO
+        // Single photo: Gemini counts visible items
         // ═══════════════════════════════════════════════════════════
-        const geminiResult = await analyzeSinglePhoto(photos[0], "").catch(() => null);
-        items = mergeSinglePhoto([], geminiResult);
-        depthNotes = geminiResult?.note || "Single angle — take a side photo to see depth";
+        console.log("[COUNTR] Single photo: Gemini counting...");
 
-        if (geminiResult) {
-          predictions = bboxesToPredictions(
-            geminiResult.bboxes,
-            geminiResult.image_width || imgDims.width,
-            geminiResult.image_height || imgDims.height,
-            imgDims.width, imgDims.height,
-          );
+        const geminiResult = await analyzeSinglePhoto(photos[0], detectionContext).catch(() => null);
+        items = mergeSinglePhoto(predictions, geminiResult);
+        depthNotes = geminiResult?.note || "Single angle — take a side photo to see depth";
+        if (geminiResult?.products) {
+          geminiProducts = geminiResult.products.map((p) => ({
+            product: p.product,
+            boxes: p.boxes,
+          }));
         }
       }
 
-      const ocrTexts = await ocrPromise;
+      // ═══════════════════════════════════════════════════════════
+      // Fallback: Use Gemini bounding boxes when DINO found nothing
+      // ═══════════════════════════════════════════════════════════
+      if (predictions.length === 0 && geminiProducts.length > 0) {
+        console.log("[COUNTR] DINO returned 0 boxes — using Gemini bounding boxes as fallback");
+        const geminiBboxes = geminiBboxToPredictions(geminiProducts, imgDims.width, imgDims.height);
+        if (geminiBboxes.length > 0) {
+          predictions = geminiBboxes;
+          console.log("[COUNTR] Gemini provided %d bounding boxes", predictions.length);
+        }
+      }
+
       const thumbnail = await makeThumbnail(photos[0]);
 
       const totalFront = items.reduce((sum, i) => sum + i.front_visible, 0);
       const totalDepth = items.reduce((sum, i) => sum + i.depth_visible, 0);
       const totalItems = items.reduce((sum, i) => sum + i.total, 0);
 
-      console.log("[SnapCount] Final: front=%d depth=%d total=%d bboxes=%d",
+      console.log("[COUNTR] Final: front=%d depth=%d total=%d boxes=%d",
         totalFront, totalDepth, totalItems, predictions.length);
 
       const scan: ScanResult = {
@@ -227,13 +251,12 @@ export function useInventoryAnalysis() {
         total_front: totalFront,
         total_depth: totalDepth,
         total_items: totalItems,
-        ocr_texts: ocrTexts,
+        ocr_texts: ocrTexts as string[],
         depth_notes: depthNotes,
         thumbnail,
         predictions,
         imageWidth: imgDims.width,
         imageHeight: imgDims.height,
-        ...(angleAnnotations.length > 0 && { angleAnnotations }),
       };
 
       saveScan(scan);

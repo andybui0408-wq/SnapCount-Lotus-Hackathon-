@@ -1,20 +1,14 @@
-import type { DinoPrediction, DinoResponse } from "../services/groundingDinoAPI";
 import type { MultiAngleResult, SinglePhotoResult } from "../services/geminiMultiAngle";
 
-export type { DinoPrediction, DinoResponse };
 export type { MultiAngleResult, SinglePhotoResult };
 
 export interface MergedPrediction {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  polygon: number[][]; // [[x1,y1], [x2,y2], ...] from Grounding DINO boxes
   confidence: number;
   class: string;
-  dino_label: string;
   catalog_match: string | null;
   catalog_similarity: number;
-  id_method: "catalog" | "grounding-dino" | "unmatched";
+  id_method: "catalog" | "dino" | "unmatched";
 }
 
 export interface MergedItem {
@@ -22,7 +16,7 @@ export interface MergedItem {
   front_visible: number;
   depth_visible: number;
   total: number;
-  id_method: "catalog" | "grounding-dino" | "gemini" | "unmatched";
+  id_method: "catalog" | "dino" | "gemini" | "unmatched";
   notes?: string;
 }
 
@@ -77,4 +71,12 @@ export interface RestockOrder {
   generatedAt: number;
 }
 
-export type TabId = "scan" | "dashboard" | "restock" | "history";
+export interface ExtractedFrame {
+  dataUrl: string;
+  base64: string;
+  blob: Blob;
+  timestamp: number;
+  sharpness: number;
+}
+
+export type TabId = "home" | "scan" | "dashboard" | "restock" | "history" | "profile";

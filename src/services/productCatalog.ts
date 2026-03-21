@@ -39,6 +39,10 @@ export function removeFromCatalog(name: string): void {
   saveCatalog(catalog);
 }
 
+export function clearCatalog(): void {
+  localStorage.removeItem(CATALOG_KEY);
+}
+
 export function listCatalogNames(): string[] {
   return getCatalog().map((p) => p.name);
 }

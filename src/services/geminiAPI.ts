@@ -12,8 +12,8 @@ export async function callGemini(messages: unknown[]): Promise<string> {
     headers: {
       Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://snapcount.app",
-      "X-Title": "SnapCount",
+      "HTTP-Referer": "https://countr.app",
+      "X-Title": "COUNTR.",
     },
     body: JSON.stringify({
       model: GEMINI_MODEL,

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useInventoryAnalysis } from "../hooks/useInventoryAnalysis";
 import { useScanContext } from "../context/ScanContext";
 import BoundingBoxOverlay from "../components/BoundingBoxOverlay";
-import PhotoCollector from "../components/PhotoCollector";
+import VideoCapture from "../components/VideoCapture";
 import SummaryCards from "../components/SummaryCards";
 import ResultsList from "../components/ResultsList";
 import VocabularyEditor from "../components/VocabularyEditor";
@@ -13,6 +13,7 @@ export default function ScanPage() {
   const [mode, setMode] = useState<"quick" | "multi">("multi");
   const [showVocab, setShowVocab] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
+  const [selectedFrame, setSelectedFrame] = useState(0);
   const { photos, setPhotos, setLastResult } = useScanContext();
   const { loading, error, result, analyze } = useInventoryAnalysis();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,9 +41,15 @@ export default function ScanPage() {
     e.target.value = "";
   };
 
-  const handleAnalyze = async () => {
+  const handleQuickAnalyze = async () => {
     if (photos.length === 0) return;
-    await analyze(photos, mode);
+    await analyze(photos, "quick");
+  };
+
+  const handleFramesReady = async (base64Frames: string[]) => {
+    setPhotos(base64Frames);
+    setSelectedFrame(0);
+    await analyze(base64Frames, "multi");
   };
 
   useEffect(() => {
@@ -52,53 +59,50 @@ export default function ScanPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Scan Inventory</h1>
+        <h1>Scan</h1>
         <div className="header-actions">
-          <button className="btn btn-ghost" onClick={() => setShowVocab(true)}>Vocabulary</button>
+          <button className="btn btn-ghost" onClick={() => setShowVocab(true)}>Vocab</button>
           <button className="btn btn-ghost" onClick={() => setShowCatalog(true)}>Catalog</button>
         </div>
       </div>
 
       <div className="mode-selector">
         <button className={`mode-btn ${mode === "multi" ? "active" : ""}`} onClick={() => setMode("multi")}>
-          Multi-angle (2-3 photos)
+          Multi-angle
         </button>
         <button className={`mode-btn ${mode === "quick" ? "active" : ""}`} onClick={() => setMode("quick")}>
-          Quick Scan (1 photo)
+          Quick
         </button>
       </div>
 
       {mode === "quick" ? (
-        <div className="upload-area">
-          {photos.length > 0 ? (
-            <div className="preview-container">
-              <img src={`data:image/jpeg;base64,${photos[0]}`} alt="Preview" className="preview-img" />
-              <button className="btn btn-ghost" onClick={() => setPhotos([])}>Clear</button>
-            </div>
-          ) : (
-            <button className="upload-btn" onClick={() => inputRef.current?.click()}>
-              <span className="upload-icon">+</span>
-              <span>Take Photo or Upload</span>
-            </button>
-          )}
-          <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={handleFile} hidden />
-        </div>
-      ) : (
-        <PhotoCollector
-          photos={photos}
-          onAddPhoto={(b64) => setPhotos([...photos, b64])}
-          onRemovePhoto={(i) => setPhotos(photos.filter((_, idx) => idx !== i))}
-          maxPhotos={3}
-        />
-      )}
+        <>
+          <div className="upload-area">
+            {photos.length > 0 ? (
+              <div className="preview-container">
+                <img src={`data:image/jpeg;base64,${photos[0]}`} alt="Preview" className="preview-img" />
+                <button className="btn btn-ghost" onClick={() => setPhotos([])}>Clear</button>
+              </div>
+            ) : (
+              <button className="upload-btn" onClick={() => inputRef.current?.click()}>
+                <span className="upload-icon">+</span>
+                <span>Take Photo or Upload</span>
+              </button>
+            )}
+            <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={handleFile} hidden />
+          </div>
 
-      <button
-        className="btn btn-primary btn-large"
-        onClick={handleAnalyze}
-        disabled={loading || photos.length === 0 || (mode === "multi" && photos.length < 2)}
-      >
-        {loading ? "Analyzing..." : "Analyze Inventory"}
-      </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleQuickAnalyze}
+            disabled={loading || photos.length === 0}
+          >
+            {loading ? "Analyzing..." : "Analyze"}
+          </button>
+        </>
+      ) : (
+        <VideoCapture onFramesReady={handleFramesReady} />
+      )}
 
       {loading && photos.length > 0 && (
         <div className="scan-loading-overlay">
@@ -114,25 +118,9 @@ export default function ScanPage() {
 
       {result && (
         <>
-          {/* Per-angle annotated images (multi-angle mode) */}
-          {result.angleAnnotations && result.angleAnnotations.length > 0 ? (
-            <div className="angle-annotations">
-              {result.angleAnnotations.map((ann, i) => (
-                <div key={i} className="angle-annotation">
-                  <h3 className="angle-label">{ann.label} view</h3>
-                  <BoundingBoxOverlay
-                    imageSrc={`data:image/jpeg;base64,${photos[i]}`}
-                    predictions={ann.predictions}
-                    imageWidth={ann.imageWidth}
-                    imageHeight={ann.imageHeight}
-                    items={result.items}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : result.predictions && result.predictions.length > 0 ? (
+          {result.predictions && result.predictions.length > 0 ? (
             <BoundingBoxOverlay
-              imageSrc={`data:image/jpeg;base64,${photos[0]}`}
+              imageSrc={`data:image/jpeg;base64,${photos[selectedFrame] || photos[0]}`}
               predictions={result.predictions}
               imageWidth={result.imageWidth || 1024}
               imageHeight={result.imageHeight || 768}
@@ -140,10 +128,31 @@ export default function ScanPage() {
             />
           ) : (
             <div className="bbox-container">
-              <img src={`data:image/jpeg;base64,${photos[0]}`} alt="Result" className="bbox-canvas" />
-              <p className="text-secondary" style={{ textAlign: "center", marginTop: 4 }}>
-                No bounding boxes detected. Try a clearer photo.
-              </p>
+              <img src={`data:image/jpeg;base64,${photos[selectedFrame] || photos[0]}`} alt="Result" style={{ width: "100%", borderRadius: "var(--radius-md)" }} />
+              {result.items.length === 0 && (
+                <p className="text-secondary" style={{ textAlign: "center", marginTop: 4 }}>
+                  No detections found. Try a clearer photo.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Frame selector for multi-angle */}
+          {photos.length > 1 && (
+            <div className="frame-selector">
+              <span className="frame-selector-label">Annotate frame</span>
+              <div className="frame-selector-grid">
+                {photos.map((photo, i) => (
+                  <button
+                    key={i}
+                    className={`frame-selector-thumb ${i === selectedFrame ? "active" : ""}`}
+                    onClick={() => setSelectedFrame(i)}
+                  >
+                    <img src={`data:image/jpeg;base64,${photo}`} alt={`Frame ${i + 1}`} />
+                    <span className="frame-selector-num">{i + 1}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

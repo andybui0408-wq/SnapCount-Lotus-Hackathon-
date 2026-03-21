@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import TrendChart from "../components/TrendChart";
 import DepletionTable from "../components/DepletionTable";
+import EmailReportButton from "../components/EmailReportButton";
 import { getProductTrends, getDepletionData } from "../services/scanHistory";
 
 export default function DashboardPage() {
@@ -13,7 +14,7 @@ export default function DashboardPage() {
 
   return (
     <div className="page">
-      <h1>Dashboard</h1>
+      <h1>Analysis</h1>
 
       {/* Alert cards */}
       <div className="alert-cards">
@@ -56,6 +57,9 @@ export default function DashboardPage() {
           <p className="text-secondary">No trend data available.</p>
         )}
       </div>
+
+      {/* Email report button — full width at bottom */}
+      <EmailReportButton />
     </div>
   );
 }
