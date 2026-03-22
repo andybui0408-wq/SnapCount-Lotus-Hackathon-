@@ -135,5 +135,5 @@ function formatDate(d: Date): string {
 }
 
 export function formatVND(amount: number): string {
-  return amount.toLocaleString("vi-VN") + "đ";
+  return amount.toLocaleString("en-US") + "đ";
 }

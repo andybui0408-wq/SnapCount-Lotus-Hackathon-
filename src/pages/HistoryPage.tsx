@@ -49,7 +49,7 @@ export default function HistoryPage() {
                 )}
                 <div className="history-meta">
                   <div className="history-date">
-                    {date.toLocaleDateString("vi-VN")} {date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                    {date.toLocaleDateString("en-US")} {date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                   </div>
                   <div className="history-summary">
                     {scan.total_items} items

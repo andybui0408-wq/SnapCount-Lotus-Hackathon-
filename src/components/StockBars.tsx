@@ -65,13 +65,13 @@ export default function StockBars({ sortBy = "urgency", filterStatus = "all" }: 
   });
 
   if (sorted.length === 0) {
-    return <p className="text-secondary">Khong co san pham phu hop.</p>;
+    return <p className="text-secondary">No matching products.</p>;
   }
 
   const statusLabel: Record<string, string> = {
-    critical: "Can nhap gap",
-    low: "Sap het",
-    healthy: "On dinh",
+    critical: "Restock now",
+    low: "Low stock",
+    healthy: "Healthy",
   };
 
   return (

@@ -22,7 +22,7 @@ export default function HomePage({ onTabChange }: Props) {
   const query = search.trim().toLowerCase();
   const filteredScans = query
     ? scans.filter((s) => {
-        const dateStr = new Date(s.timestamp).toLocaleDateString("vi-VN");
+        const dateStr = new Date(s.timestamp).toLocaleDateString("en-US");
         const productNames = s.items.map((i) => i.name.toLowerCase()).join(" ");
         return dateStr.includes(query) || productNames.includes(query);
       })
@@ -77,15 +77,15 @@ export default function HomePage({ onTabChange }: Props) {
       {/* AI Briefing */}
       <AIBriefingCard />
 
-      {/* Stats in Vietnamese — full width */}
+      {/* Stats — full width */}
       <div className="home-stats">
         <div className="home-stat">
           <div className="home-stat-number">{criticalCount}</div>
-          <div className="home-stat-label">San pham can nhap</div>
+          <div className="home-stat-label">Needs restock</div>
         </div>
         <div className="home-stat">
           <div className="home-stat-number">{totalItems}</div>
-          <div className="home-stat-label">Tong san pham</div>
+          <div className="home-stat-label">Total items</div>
         </div>
       </div>
 
@@ -93,13 +93,13 @@ export default function HomePage({ onTabChange }: Props) {
       {needsRestock.length > 0 && (
         <div>
           <div className="home-section-header">
-            <span className="home-section-title">San pham can nhap</span>
+            <span className="home-section-title">Low Stock</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {needsRestock.map((item) => (
               <div key={item.name} className="home-critical-item">
                 <span className="home-critical-name">{item.name}</span>
-                <span className="home-critical-count mono">{item.total} con lai</span>
+                <span className="home-critical-count mono">{item.total} left</span>
               </div>
             ))}
           </div>
@@ -110,7 +110,7 @@ export default function HomePage({ onTabChange }: Props) {
       {scans.length > 0 && (
         <div>
           <div className="home-section-header">
-            <span className="home-section-title">Quet gan day</span>
+            <span className="home-section-title">Recent Scans</span>
             <span className="home-section-arrow" onClick={() => onTabChange("history")} style={{ cursor: "pointer" }}>&rarr;</span>
           </div>
 
@@ -123,7 +123,7 @@ export default function HomePage({ onTabChange }: Props) {
             <input
               type="text"
               className="home-search-input"
-              placeholder="Tim kiem san pham hoac ngay..."
+              placeholder="Search products or dates..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -157,10 +157,10 @@ export default function HomePage({ onTabChange }: Props) {
                     )}
                     <div className="home-scan-row-info">
                       <span className="home-scan-row-date mono">
-                        {date.toLocaleDateString("vi-VN")} · {date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                        {date.toLocaleDateString("en-US")} · {date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                       </span>
                       <span className="home-scan-row-count">
-                        {scan.total_items} san pham · {scan.items.length} loai
+                        {scan.total_items} items · {scan.items.length} types
                       </span>
                       <span className="home-scan-row-products">{topProducts}</span>
                     </div>
@@ -170,7 +170,7 @@ export default function HomePage({ onTabChange }: Props) {
             </div>
           ) : (
             <p className="text-secondary" style={{ fontSize: 13, textAlign: "center", padding: "var(--space-md) 0" }}>
-              Khong tim thay ket qua cho "{search}"
+              No results found for "{search}"
             </p>
           )}
         </div>

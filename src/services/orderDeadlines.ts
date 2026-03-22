@@ -1,6 +1,6 @@
 import { getDepletionData } from "./scanHistory";
 
-const VIETNAMESE_WEEKDAYS = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export interface OrderDeadline {
   product: string;
@@ -30,7 +30,7 @@ export function calculateDeadlines(): OrderDeadline[] {
       else if (daysDiff <= 6) urgency = "this_week";
       else urgency = "safe";
 
-      const weekday = VIETNAMESE_WEEKDAYS[orderByDate.getDay()];
+      const weekday = WEEKDAYS[orderByDate.getDay()];
       const dateStr = `${orderByDate.getDate()}/${orderByDate.getMonth() + 1}`;
       const orderByLabel = `${weekday} ${dateStr}`;
 

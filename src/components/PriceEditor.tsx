@@ -38,7 +38,7 @@ export default function PriceEditor({ onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal price-editor-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Giá bán sản phẩm</h3>
+          <h3>Product Prices</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
         <div className="modal-body">
@@ -64,10 +64,10 @@ export default function PriceEditor({ onClose }: Props) {
             ))}
           </div>
           {productNames.length === 0 && (
-            <p className="text-secondary">Quét hàng tồn kho trước để có danh sách sản phẩm.</p>
+            <p className="text-secondary">Scan inventory first to get your product list.</p>
           )}
           <button className="btn btn-primary" onClick={handleSave}>
-            Lưu giá
+            Save Prices
           </button>
         </div>
       </div>

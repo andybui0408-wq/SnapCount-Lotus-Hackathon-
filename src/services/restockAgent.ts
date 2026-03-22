@@ -22,14 +22,14 @@ export async function generateRestockOrder(): Promise<RestockItem[]> {
   // Fallback: use latest scan if no depletion data
   if (lowStock.length === 0) {
     const scans = getScans();
-    if (scans.length === 0) throw new Error("Chua co du lieu quet. Hay quet hang hoa truoc.");
+    if (scans.length === 0) throw new Error("No scan data yet. Scan your inventory first.");
     const latest = scans[0];
     lowStock = latest.items
       .filter((i) => i.total <= threshold)
       .map((i) => ({ name: i.name, currentStock: i.total, avgPerDay: 1, status: i.total <= Math.floor(threshold * 0.3) ? "critical" : "low" }));
   }
 
-  if (lowStock.length === 0) throw new Error("Tat ca san pham deu on dinh — khong can nhap hang.");
+  if (lowStock.length === 0) throw new Error("All products are healthy — no restock needed.");
 
   const context = JSON.stringify(lowStock);
 

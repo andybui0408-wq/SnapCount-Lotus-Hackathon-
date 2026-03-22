@@ -9,7 +9,7 @@ interface Props {
 export default function SupplierSelector({ suppliers, selected, onSelect }: Props) {
   return (
     <div className="supplier-selector">
-      <label>Nhà cung cấp</label>
+      <label>Supplier</label>
       <select
         value={selected?.id || ""}
         onChange={(e) => {
@@ -17,7 +17,7 @@ export default function SupplierSelector({ suppliers, selected, onSelect }: Prop
           if (s) onSelect(s);
         }}
       >
-        <option value="">Chọn nhà cung cấp...</option>
+        <option value="">Select supplier...</option>
         {suppliers.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name} — {s.phone} ({s.category})

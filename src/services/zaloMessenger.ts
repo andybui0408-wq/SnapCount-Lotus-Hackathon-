@@ -12,14 +12,14 @@ export function generateZaloMessage(
   );
 
   return [
-    `Chào ${supplier.name},`,
+    `Hi ${supplier.name},`,
     ``,
-    `Em muốn đặt hàng:`,
+    `I'd like to place an order:`,
     ...lines,
     ``,
-    `Tổng cộng: ${formatVND(totalCost)}`,
+    `Total: ${formatVND(totalCost)}`,
     ``,
-    `Nhờ anh/chị xác nhận giúp em. Cảm ơn!`,
+    `Please confirm. Thank you!`,
   ].join("\n");
 }
 

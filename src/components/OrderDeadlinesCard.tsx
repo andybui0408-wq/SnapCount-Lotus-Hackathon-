@@ -13,7 +13,7 @@ export default function OrderDeadlinesCard() {
 
   return (
     <div className="deadlines-section">
-      <h2 className="section-heading">Đặt hàng trước</h2>
+      <h2 className="section-heading">Order Deadlines</h2>
       <div className="deadlines-list">
         {deadlines.map((d) => (
           <DeadlineCard key={d.product} deadline={d} />
@@ -30,8 +30,8 @@ function DeadlineCard({ deadline }: { deadline: OrderDeadline }) {
     "deadline-pill-week";
 
   const pillText =
-    deadline.urgency === "today" ? "ĐẶT NGAY" :
-    deadline.urgency === "tomorrow" ? "Ngày mai" :
+    deadline.urgency === "today" ? "ORDER NOW" :
+    deadline.urgency === "tomorrow" ? "Tomorrow" :
     deadline.orderByLabel;
 
   const runsOutLabel = `${deadline.runsOutDate.getDate()}/${deadline.runsOutDate.getMonth() + 1}`;
@@ -43,7 +43,7 @@ function DeadlineCard({ deadline }: { deadline: OrderDeadline }) {
         <span className={`deadline-pill ${pillClass}`}>{pillText}</span>
       </div>
       <div className="deadline-detail">
-        Còn {deadline.currentStock} · Hết: {runsOutLabel}
+        {deadline.currentStock} left · Runs out: {runsOutLabel}
       </div>
     </div>
   );

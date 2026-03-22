@@ -25,7 +25,7 @@ export default function ProfilePage() {
   };
 
   const handleRemoveProduct = (name: string) => {
-    if (!confirm(`Xóa "${name}" khỏi cửa hàng?`)) return;
+    if (!confirm(`Remove "${name}" from your store?`)) return;
     removeProductFromHistory(name);
     removeFromCatalog(name);
     removeFromVocabulary(name);
@@ -34,7 +34,7 @@ export default function ProfilePage() {
   };
 
   const handleClearAll = () => {
-    if (!confirm("Xóa tất cả dữ liệu? Hành động này không thể hoàn tác.")) return;
+    if (!confirm("Delete all data? This action cannot be undone.")) return;
     clearAllData();
     setCleared(true);
     setTimeout(() => window.location.reload(), 800);
@@ -86,17 +86,17 @@ export default function ProfilePage() {
       {/* Product list — remove individual products */}
       {products.length > 0 && (
         <div className="profile-section">
-          <div className="profile-section-title">San pham ({products.length})</div>
+          <div className="profile-section-title">Products ({products.length})</div>
           {products.map((p) => (
             <div key={p.name} className="profile-product-row">
               <div className="profile-product-info">
                 <span className="profile-product-name">{p.name}</span>
-                <span className="profile-product-stock mono">{p.currentStock} con lai</span>
+                <span className="profile-product-stock mono">{p.currentStock} left</span>
               </div>
               <button
                 className="profile-product-remove"
                 onClick={() => handleRemoveProduct(p.name)}
-                title="Xóa sản phẩm"
+                title="Remove product"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"/>
@@ -110,17 +110,17 @@ export default function ProfilePage() {
 
       {/* Clear all data */}
       <div className="profile-section">
-        <div className="profile-section-title">Du lieu</div>
+        <div className="profile-section-title">Data</div>
         <button
           className="btn btn-danger"
           style={{ width: "100%", marginTop: 4 }}
           onClick={handleClearAll}
           disabled={cleared}
         >
-          {cleared ? "Da xoa — dang tai lai..." : "Xoa tat ca du lieu"}
+          {cleared ? "Deleted — reloading..." : "Clear all data"}
         </button>
         <p className="text-secondary" style={{ fontSize: 11, marginTop: 4 }}>
-          Xoa lich su quet, catalog, gia, tu vung phat hien
+          Clears scan history, catalog, prices, detection vocabulary
         </p>
       </div>
 

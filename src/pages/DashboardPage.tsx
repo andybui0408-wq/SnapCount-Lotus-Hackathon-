@@ -32,18 +32,18 @@ export default function DashboardPage() {
 
       <div className="section">
         <div className="dash-stock-header">
-          <h2 className="section-heading">Ton kho</h2>
+          <h2 className="section-heading">Inventory</h2>
           <button
             className="dash-threshold-btn mono"
             onClick={() => setEditingThreshold(!editingThreshold)}
           >
-            Nguong: {threshold}
+            Threshold: {threshold}
           </button>
         </div>
 
         {editingThreshold && (
           <div className="dash-threshold-editor">
-            <label className="dash-threshold-label">Nguong nhap hang (so luong)</label>
+            <label className="dash-threshold-label">Restock threshold (qty)</label>
             <input
               type="number"
               min={1}
@@ -62,7 +62,7 @@ export default function DashboardPage() {
                 className={`dash-filter-btn${filterStatus === f ? " active" : ""}`}
                 onClick={() => setFilterStatus(f)}
               >
-                {f === "all" ? "Tat ca" : f === "critical" ? "Can nhap" : f === "low" ? "Sap het" : "On dinh"}
+                {f === "all" ? "All" : f === "critical" ? "Critical" : f === "low" ? "Low" : "Healthy"}
               </button>
             ))}
           </div>
@@ -71,9 +71,9 @@ export default function DashboardPage() {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
           >
-            <option value="urgency">Muc do</option>
-            <option value="name">Ten A-Z</option>
-            <option value="stock">So luong</option>
+            <option value="urgency">Urgency</option>
+            <option value="name">Name A-Z</option>
+            <option value="stock">Quantity</option>
           </select>
         </div>
 

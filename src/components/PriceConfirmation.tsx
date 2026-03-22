@@ -40,9 +40,9 @@ export default function PriceConfirmation({ items, onConfirm }: Props) {
   return (
     <div className="price-confirm">
       <div className="price-confirm-header">
-        <span className="price-confirm-title">Giá bán</span>
+        <span className="price-confirm-title">Sell Price</span>
         <span className="price-confirm-subtitle">
-          {hasNewProducts ? "Xác nhận giá để xem doanh thu" : "Giá đã lưu từ lần trước"}
+          {hasNewProducts ? "Confirm prices to see revenue" : "Prices saved from last time"}
         </span>
       </div>
       <div className="price-confirm-list">
@@ -73,7 +73,7 @@ export default function PriceConfirmation({ items, onConfirm }: Props) {
         })}
       </div>
       <button className="btn btn-confirm-prices" onClick={handleConfirm}>
-        Xác nhận giá bán ✓
+        Confirm Prices
       </button>
     </div>
   );

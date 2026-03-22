@@ -50,17 +50,17 @@ Return ONLY valid JSON, no markdown:
 
 export const OCR_PROMPT = `Read ALL visible text from product labels in this image.
 Return ONLY a JSON array of strings, no markdown:
-["Coca-Cola", "Fanta Orange", "Hảo Hảo"]`;
+["Coca-Cola", "Fanta Orange", "Instant Noodle"]`;
 
-export const RESTOCK_PROMPT = `You are a Vietnamese store inventory assistant. Based on these stock levels and trends, generate a restock purchase order.
+export const RESTOCK_PROMPT = `You are a store inventory assistant. Based on these stock levels and trends, generate a restock purchase order.
 
 Return JSON:
 {
   "items": [
-    { "name": "Coca-Cola lon", "currentStock": 5, "suggestedQty": 24, "unitPrice": 8000 }
+    { "name": "Coca-Cola can", "currentStock": 5, "suggestedQty": 24, "unitPrice": 8000 }
   ],
   "urgency": "high",
-  "notes": "Mì Hảo Hảo sắp hết, cần đặt gấp"
+  "notes": "Running low on instant noodles, order urgently"
 }
 
-Use Vietnamese product names. Prices in VND. Return ONLY valid JSON.`;
+Prices in VND. Return ONLY valid JSON.`;
