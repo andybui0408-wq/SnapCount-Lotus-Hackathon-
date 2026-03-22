@@ -2313,6 +2313,105 @@ body {
   transition: width 0.3s ease;
 }
 
+/* ── Dashboard Controls ─────────────────────────────────────── */
+.dash-stock-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.dash-threshold-btn {
+  background: var(--off-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--charcoal);
+  transition: border-color 0.15s;
+}
+
+.dash-threshold-btn:hover { border-color: var(--charcoal); }
+
+.dash-threshold-editor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  padding: 10px 12px;
+  background: var(--off-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.dash-threshold-label {
+  font-size: 13px;
+  color: var(--charcoal);
+  flex: 1;
+}
+
+.dash-threshold-input {
+  width: 60px;
+  text-align: center;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  background: var(--white);
+  color: var(--black);
+  outline: none;
+}
+
+.dash-threshold-input:focus { border-color: var(--charcoal); }
+
+.dash-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.dash-filter-group {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.dash-filter-btn {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--charcoal);
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dash-filter-btn:hover { border-color: var(--charcoal); }
+
+.dash-filter-btn.active {
+  background: var(--black);
+  color: var(--white);
+  border-color: var(--black);
+}
+
+.dash-sort-select {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--charcoal);
+  outline: none;
+  cursor: pointer;
+}
+
 /* ── Revenue Strip ───────────────────────────────────────────── */
 .revenue-strip {
   display: grid;

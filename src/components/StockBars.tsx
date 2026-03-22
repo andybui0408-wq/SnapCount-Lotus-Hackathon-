@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { getSnapshots } from "../services/scanHistory";
+import { getScans, getSnapshots } from "../services/scanHistory";
+import { getRestockThreshold } from "../services/settingsStore";
 
 interface StockBarItem {
   name: string;
@@ -9,34 +10,62 @@ interface StockBarItem {
   status: "critical" | "low" | "healthy";
 }
 
-export default function StockBars() {
+interface Props {
+  sortBy?: "name" | "urgency" | "stock";
+  filterStatus?: "all" | "critical" | "low" | "healthy";
+}
+
+export default function StockBars({ sortBy = "urgency", filterStatus = "all" }: Props) {
+  const threshold = getRestockThreshold();
+
   const items = useMemo<StockBarItem[]>(() => {
     const snapshots = getSnapshots();
-    if (snapshots.length === 0) return [];
+
+    // If no snapshots, use latest scan
+    if (snapshots.length === 0) {
+      const scans = getScans();
+      if (scans.length === 0) return [];
+      const latest = scans[0];
+      return latest.items.map((item) => {
+        const maxRef = Math.max(threshold * 2, item.total, 1);
+        const fillPct = Math.min(100, Math.round((item.total / maxRef) * 100));
+        const status: StockBarItem["status"] =
+          item.total <= Math.floor(threshold * 0.3) ? "critical" :
+          item.total <= threshold ? "low" : "healthy";
+        return { name: item.name, current: item.total, maxHistorical: maxRef, fillPct, status };
+      });
+    }
 
     const allProducts = new Set<string>();
     for (const s of snapshots) {
       for (const p of Object.keys(s.products)) allProducts.add(p);
     }
 
-    return Array.from(allProducts)
-      .map((name) => {
-        const values = snapshots.map((s) => s.products[name] ?? 0);
-        const current = values[values.length - 1];
-        const maxHistorical = Math.max(...values, 1);
-        const fillPct = Math.round((current / maxHistorical) * 100);
+    return Array.from(allProducts).map((name) => {
+      const values = snapshots.map((s) => s.products[name] ?? 0);
+      const current = values[values.length - 1];
+      const maxHistorical = Math.max(...values, 1);
+      const fillPct = Math.round((current / maxHistorical) * 100);
+      const status: StockBarItem["status"] =
+        current <= Math.floor(threshold * 0.3) ? "critical" :
+        current <= threshold ? "low" : "healthy";
+      return { name, current, maxHistorical, fillPct, status };
+    });
+  }, [threshold]);
 
-        // Determine status based on fill percentage
-        const status: StockBarItem["status"] =
-          fillPct <= 15 ? "critical" : fillPct <= 40 ? "low" : "healthy";
+  // Filter
+  const filtered = filterStatus === "all" ? items : items.filter((i) => i.status === filterStatus);
 
-        return { name, current, maxHistorical, fillPct, status };
-      })
-      .sort((a, b) => a.fillPct - b.fillPct); // most empty first
-  }, []);
+  // Sort
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === "name") return a.name.localeCompare(b.name);
+    if (sortBy === "stock") return a.current - b.current;
+    const order = { critical: 0, low: 1, healthy: 2 };
+    return order[a.status] - order[b.status] || a.current - b.current;
+  });
 
-  if (items.length === 0) {
-    return <p className="text-secondary">Chua co du lieu ton kho.</p>;
+  if (sorted.length === 0) {
+    return <p className="text-secondary">Khong co san pham phu hop.</p>;
   }
 
   const statusLabel: Record<string, string> = {
@@ -47,7 +76,7 @@ export default function StockBars() {
 
   return (
     <div className="stock-bars">
-      {items.map((item) => {
+      {sorted.map((item) => {
         const barColor =
           item.status === "critical" ? "var(--black)" :
           item.status === "low" ? "var(--charcoal)" :
