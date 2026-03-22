@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { getScans, getDepletionData } from "../services/scanHistory";
 import type { TabId } from "../types";
 
@@ -9,10 +9,20 @@ interface Props {
 export default function HomePage({ onTabChange }: Props) {
   const scans = useMemo(() => getScans(), []);
   const depletion = useMemo(() => getDepletionData(), []);
+  const [search, setSearch] = useState("");
 
   const criticalCount = depletion.filter((d) => d.status === "critical").length;
   const totalItems = depletion.reduce((sum, d) => sum + d.currentStock, 0);
   const criticalItems = depletion.filter((d) => d.status === "critical");
+
+  const query = search.trim().toLowerCase();
+  const filteredScans = query
+    ? scans.filter((s) => {
+        const dateStr = new Date(s.timestamp).toLocaleDateString("vi-VN");
+        const productNames = s.items.map((i) => i.name.toLowerCase()).join(" ");
+        return dateStr.includes(query) || productNames.includes(query);
+      })
+    : scans;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)", padding: "var(--space-xl) 20px 0" }}>
@@ -89,16 +99,73 @@ export default function HomePage({ onTabChange }: Props) {
         </div>
       )}
 
-      {/* Recent scans summary */}
+      {/* Recent scans with search */}
       {scans.length > 0 && (
         <div>
           <div className="home-section-header">
             <span className="home-section-title">Quet gan day</span>
             <span className="home-section-arrow" onClick={() => onTabChange("history")} style={{ cursor: "pointer" }}>&rarr;</span>
           </div>
-          <p className="text-secondary" style={{ fontSize: 13 }}>
-            {scans.length} lan quet · Lan cuoi: {new Date(scans[0].timestamp).toLocaleDateString("vi-VN")}
-          </p>
+
+          {/* Search bar */}
+          <div className="home-search">
+            <svg className="home-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              className="home-search-input"
+              placeholder="Tim kiem san pham hoac ngay..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button className="home-search-clear" onClick={() => setSearch("")}>&times;</button>
+            )}
+          </div>
+
+          {/* Scan cards */}
+          {filteredScans.length > 0 ? (
+            <div className="home-scan-list">
+              {filteredScans.slice(0, 10).map((scan) => {
+                const date = new Date(scan.timestamp);
+                const topProducts = scan.items.slice(0, 3).map((i) => i.name).join(", ");
+                return (
+                  <div key={scan.id} className="home-scan-card-row" onClick={() => onTabChange("history")}>
+                    {scan.thumbnail ? (
+                      <img
+                        src={`data:image/jpeg;base64,${scan.thumbnail}`}
+                        alt="Scan"
+                        className="home-scan-row-thumb"
+                      />
+                    ) : (
+                      <div className="home-scan-row-thumb-placeholder">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                          <circle cx="8.5" cy="8.5" r="1.5"/>
+                          <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                      </div>
+                    )}
+                    <div className="home-scan-row-info">
+                      <span className="home-scan-row-date mono">
+                        {date.toLocaleDateString("vi-VN")} · {date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className="home-scan-row-count">
+                        {scan.total_items} san pham · {scan.items.length} loai
+                      </span>
+                      <span className="home-scan-row-products">{topProducts}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-secondary" style={{ fontSize: 13, textAlign: "center", padding: "var(--space-md) 0" }}>
+              Khong tim thay ket qua cho "{search}"
+            </p>
+          )}
         </div>
       )}
     </div>
