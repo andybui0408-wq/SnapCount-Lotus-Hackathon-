@@ -6,6 +6,7 @@ interface StockBarItem {
   current: number;
   maxHistorical: number;
   fillPct: number;
+  status: "critical" | "low" | "healthy";
 }
 
 export default function StockBars() {
@@ -24,28 +25,44 @@ export default function StockBars() {
         const current = values[values.length - 1];
         const maxHistorical = Math.max(...values, 1);
         const fillPct = Math.round((current / maxHistorical) * 100);
-        return { name, current, maxHistorical, fillPct };
+
+        // Determine status based on fill percentage
+        const status: StockBarItem["status"] =
+          fillPct <= 15 ? "critical" : fillPct <= 40 ? "low" : "healthy";
+
+        return { name, current, maxHistorical, fillPct, status };
       })
       .sort((a, b) => a.fillPct - b.fillPct); // most empty first
   }, []);
 
   if (items.length === 0) {
-    return <p className="text-secondary">Chưa có dữ liệu tồn kho.</p>;
+    return <p className="text-secondary">Chua co du lieu ton kho.</p>;
   }
+
+  const statusLabel: Record<string, string> = {
+    critical: "Can nhap gap",
+    low: "Sap het",
+    healthy: "On dinh",
+  };
 
   return (
     <div className="stock-bars">
       {items.map((item) => {
         const barColor =
-          item.fillPct <= 15 ? "var(--black)" :
-          item.fillPct <= 40 ? "var(--charcoal)" :
+          item.status === "critical" ? "var(--black)" :
+          item.status === "low" ? "var(--charcoal)" :
           "var(--stone)";
 
         return (
           <div key={item.name} className="stock-bar-item">
             <div className="stock-bar-header">
               <span className="stock-bar-name">{item.name}</span>
-              <span className="stock-bar-qty">{item.current}</span>
+              <div className="stock-bar-right">
+                <span className={`stock-bar-tag stock-bar-tag-${item.status}`}>
+                  {statusLabel[item.status]}
+                </span>
+                <span className="stock-bar-qty">{item.current}</span>
+              </div>
             </div>
             <div className="stock-bar-track">
               <div

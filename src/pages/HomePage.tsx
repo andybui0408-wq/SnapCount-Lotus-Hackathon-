@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { getScans, getDepletionData } from "../services/scanHistory";
+import AIBriefingCard from "../components/AIBriefingCard";
 import type { TabId } from "../types";
 
 interface Props {
@@ -69,6 +70,9 @@ export default function HomePage({ onTabChange }: Props) {
           </button>
         </div>
       </div>
+
+      {/* AI Briefing */}
+      <AIBriefingCard />
 
       {/* Stats in Vietnamese — full width */}
       <div className="home-stats">

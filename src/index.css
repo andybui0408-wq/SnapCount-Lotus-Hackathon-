@@ -2246,10 +2246,42 @@ body {
   font-weight: 500;
 }
 
+.stock-bar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .stock-bar-qty {
   font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 700;
+}
+
+.stock-bar-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.stock-bar-tag-critical {
+  background: var(--black);
+  color: var(--white);
+}
+
+.stock-bar-tag-low {
+  background: var(--charcoal);
+  color: var(--white);
+}
+
+.stock-bar-tag-healthy {
+  background: var(--off-white);
+  border: 1px solid var(--border);
+  color: var(--charcoal);
 }
 
 .stock-bar-track {
