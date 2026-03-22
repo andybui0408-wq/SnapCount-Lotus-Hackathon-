@@ -55,9 +55,15 @@ function updateSnapshot(scan: ScanResult): void {
 
 // ── Suppliers ───────────────────────────────────────────────────────
 
+const DEFAULT_SUPPLIERS: Supplier[] = [
+  { id: "s1", name: "Minh Phat Trading", phone: "0901234567", category: "Beverages" },
+  { id: "s2", name: "Saigon Wholesale", phone: "0912345678", category: "Snacks & Noodles" },
+  { id: "s3", name: "Thanh Long Supply", phone: "0923456789", category: "General" },
+];
+
 export function getSuppliers(): Supplier[] {
   const raw = localStorage.getItem(SUPPLIERS_KEY);
-  return raw ? JSON.parse(raw) : [];
+  return raw ? JSON.parse(raw) : DEFAULT_SUPPLIERS;
 }
 
 export function saveSuppliers(suppliers: Supplier[]): void {

@@ -71,15 +71,19 @@ export default function RestockPage() {
         </>
       )}
 
-      {stage === "confirmed" && order.supplier && (
+      {stage === "confirmed" && (
         <div className="confirmed-order">
           <div className="success-box">Order confirmed!</div>
 
-          <div className="zalo-section">
-            <h3>Send to {order.supplier.name}</h3>
-            <pre className="zalo-preview">{zaloMessage}</pre>
-            <ZaloSendButton message={zaloMessage} phone={order.supplier.phone} />
-          </div>
+          {order.supplier ? (
+            <div className="zalo-section">
+              <h3>Send to {order.supplier.name}</h3>
+              <pre className="zalo-preview">{zaloMessage}</pre>
+              <ZaloSendButton message={zaloMessage} phone={order.supplier.phone} />
+            </div>
+          ) : (
+            <p className="text-secondary">Select a supplier to send the order via Zalo.</p>
+          )}
 
           <button className="btn btn-ghost" onClick={reset}>New Order</button>
         </div>
