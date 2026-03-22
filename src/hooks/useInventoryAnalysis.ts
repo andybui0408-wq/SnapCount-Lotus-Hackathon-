@@ -6,6 +6,7 @@ import { matchCatalog, getCatalog } from "../services/productCatalog";
 import { mergeConsensus, mergeSinglePhoto } from "../services/mergeResults";
 import { buildFrameDetections, computeConsensus } from "../services/consensusCount";
 import { saveScan } from "../services/scanHistory";
+import { savePrices, getPrice } from "../services/priceStore";
 import type { ScanResult, MergedPrediction, MergedItem, AngleAnnotation } from "../types";
 import { THUMBNAIL_SIZE, THUMBNAIL_QUALITY } from "../constants/config";
 
@@ -257,6 +258,13 @@ export function useInventoryAnalysis() {
       };
 
       saveScan(scan);
+
+      // Auto-save Gemini-estimated prices for products that don't have saved prices yet
+      const aiPrices = scan.items
+        .filter((i) => i.estimated_price && i.estimated_price > 0 && getPrice(i.name) === null)
+        .map((i) => ({ name: i.name, sellPrice: i.estimated_price! }));
+      if (aiPrices.length > 0) savePrices(aiPrices);
+
       setState({ loading: false, error: null, result: scan });
     } catch (err) {
       setState({
