@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { getScans, getDepletionData } from "../services/scanHistory";
 import AIBriefingCard from "../components/AIBriefingCard";
 import type { TabId } from "../types";
@@ -8,12 +8,16 @@ interface Props {
 }
 
 export default function HomePage({ onTabChange }: Props) {
-  const scans = useMemo(() => getScans(), []);
-  const depletion = useMemo(() => getDepletionData(), []);
+  const scans = getScans();
+  const depletion = getDepletionData();
   const [search, setSearch] = useState("");
 
+  // Use depletion data if available (needs 2+ snapshots), otherwise use latest scan
+  const latestScan = scans[0];
   const criticalCount = depletion.filter((d) => d.status === "critical").length;
-  const totalItems = depletion.reduce((sum, d) => sum + d.currentStock, 0);
+  const totalItems = depletion.length > 0
+    ? depletion.reduce((sum, d) => sum + d.currentStock, 0)
+    : latestScan?.total_items ?? 0;
   const criticalItems = depletion.filter((d) => d.status === "critical");
 
   const query = search.trim().toLowerCase();
