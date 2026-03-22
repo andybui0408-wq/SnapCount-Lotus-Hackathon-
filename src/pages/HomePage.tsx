@@ -15,18 +15,14 @@ export default function HomePage({ onTabChange }: Props) {
   const criticalItems = depletion.filter((d) => d.status === "critical");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)", overflow: "hidden", padding: "0 20px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)", padding: "var(--space-xl) 20px 0" }}>
       {/* Brand header */}
-      <div style={{ paddingTop: "var(--space-xl)" }}>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>COUNTR.</h1>
-      </div>
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>COUNTR.</h1>
 
       {/* Tools */}
       <div>
-        <div className="home-section">
-          <div className="home-section-header">
-            <span className="home-section-title">Tools</span>
-          </div>
+        <div className="home-section-header">
+          <span className="home-section-title">Tools</span>
         </div>
         <div className="home-tools">
           <button className="home-tool-btn" onClick={() => onTabChange("dashboard")}>
@@ -64,7 +60,7 @@ export default function HomePage({ onTabChange }: Props) {
         </div>
       </div>
 
-      {/* Stats in Vietnamese */}
+      {/* Stats in Vietnamese — full width */}
       <div className="home-stats">
         <div className="home-stat">
           <div className="home-stat-number">{criticalCount}</div>
@@ -79,10 +75,8 @@ export default function HomePage({ onTabChange }: Props) {
       {/* Critical items list */}
       {criticalItems.length > 0 && (
         <div>
-          <div className="home-section">
-            <div className="home-section-header">
-              <span className="home-section-title">San pham sap het</span>
-            </div>
+          <div className="home-section-header">
+            <span className="home-section-title">San pham sap het</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {criticalItems.map((item) => (
@@ -98,11 +92,9 @@ export default function HomePage({ onTabChange }: Props) {
       {/* Recent scans summary */}
       {scans.length > 0 && (
         <div>
-          <div className="home-section">
-            <div className="home-section-header">
-              <span className="home-section-title">Quet gan day</span>
-              <span className="home-section-arrow" onClick={() => onTabChange("history")} style={{ cursor: "pointer" }}>&rarr;</span>
-            </div>
+          <div className="home-section-header">
+            <span className="home-section-title">Quet gan day</span>
+            <span className="home-section-arrow" onClick={() => onTabChange("history")} style={{ cursor: "pointer" }}>&rarr;</span>
           </div>
           <p className="text-secondary" style={{ fontSize: 13 }}>
             {scans.length} lan quet · Lan cuoi: {new Date(scans[0].timestamp).toLocaleDateString("vi-VN")}

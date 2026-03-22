@@ -117,62 +117,13 @@ export function getDepletionData(): Array<{
   });
 }
 
-// ── Demo data ───────────────────────────────────────────────────────
-
-export function seedDemoData(): void {
-  if (localStorage.getItem(SEEDED_KEY)) return;
-
-  const products: Record<string, number[]> = {
-    "Coca-Cola lon": [24, 22, 18, 15, 12, 8, 5],
-    "Fanta Orange": [18, 18, 16, 14, 11, 9, 7],
-    "Mì Hảo Hảo": [30, 28, 25, 20, 16, 10, 4],
-    "Nước mắm Chin-Su": [12, 12, 11, 11, 10, 10, 9],
-    "Trà xanh C2": [20, 17, 14, 12, 9, 6, 3],
-    "Monster Energy": [10, 9, 8, 7, 5, 3, 1],
-    "Bia Tiger": [36, 34, 30, 28, 24, 20, 18],
-    "Bánh mì Kinh Đô": [15, 13, 10, 8, 5, 3, 1],
-  };
-
-  const snapshots: InventorySnapshot[] = [];
-  const now = Date.now();
-
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(now - (6 - i) * 86400000);
-    const prods: Record<string, number> = {};
-    for (const [name, vals] of Object.entries(products)) {
-      prods[name] = vals[i];
-    }
-    snapshots.push({
-      date: formatDate(d),
-      timestamp: d.getTime(),
-      products: prods,
-    });
+/** Remove a specific product from all snapshot history */
+export function removeProductFromHistory(productName: string): void {
+  const snapshots = getSnapshots();
+  for (const snap of snapshots) {
+    delete snap.products[productName];
   }
-
   localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(snapshots));
-
-  const suppliers: Supplier[] = [
-    { id: "s1", name: "Đại lý nước giải khát Minh Phát", phone: "0912345678", category: "drinks" },
-    { id: "s2", name: "Cửa hàng thực phẩm Hương Giang", phone: "0987654321", category: "food" },
-    { id: "s3", name: "NPP Bia Tiger khu vực HCM", phone: "0909876543", category: "beer" },
-    { id: "s4", name: "Test Supplier", phone: "0971920305", category: "all" },
-  ];
-  localStorage.setItem(SUPPLIERS_KEY, JSON.stringify(suppliers));
-
-  // Seed demo sell prices
-  const demoPrices = [
-    { name: "Coca-Cola lon", sellPrice: 10000 },
-    { name: "Fanta Orange", sellPrice: 10000 },
-    { name: "Mì Hảo Hảo", sellPrice: 5000 },
-    { name: "Nước mắm Chin-Su", sellPrice: 25000 },
-    { name: "Trà xanh C2", sellPrice: 8000 },
-    { name: "Monster Energy", sellPrice: 22000 },
-    { name: "Bia Tiger", sellPrice: 15000 },
-    { name: "Bánh mì Kinh Đô", sellPrice: 12000 },
-  ];
-  localStorage.setItem(PRICES_KEY, JSON.stringify(demoPrices));
-
-  localStorage.setItem(SEEDED_KEY, "true");
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────

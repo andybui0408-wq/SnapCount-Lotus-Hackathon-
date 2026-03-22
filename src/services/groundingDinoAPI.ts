@@ -59,6 +59,14 @@ export function hasCustomVocabulary(): boolean {
   return loadCustomVocabulary() !== null;
 }
 
+export function removeFromVocabulary(name: string) {
+  const custom = loadCustomVocabulary();
+  if (!custom) return;
+  const filtered = custom.filter((v) => v.toLowerCase() !== name.toLowerCase());
+  localStorage.setItem(VOCAB_KEY, JSON.stringify(filtered));
+  currentVocabulary = filtered.length > 0 ? filtered : [...DEFAULT_VOCABULARY];
+}
+
 export function reloadVocabulary() {
   currentVocabulary = loadCustomVocabulary() || [...DEFAULT_VOCABULARY];
 }

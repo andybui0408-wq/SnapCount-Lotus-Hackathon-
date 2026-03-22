@@ -1,5 +1,4 @@
 import { useState } from "react";
-import AIBriefingCard from "../components/AIBriefingCard";
 import OrderDeadlinesCard from "../components/OrderDeadlinesCard";
 import StockBars from "../components/StockBars";
 import RevenueStrip from "../components/RevenueStrip";
@@ -13,10 +12,7 @@ export default function DashboardPage() {
     <div className="page">
       <h1>Dashboard</h1>
 
-      {/* A) AI Daily Briefing */}
-      <AIBriefingCard />
-
-      {/* B) Order deadline cards */}
+      {/* Order deadline cards */}
       <OrderDeadlinesCard />
 
       {/* C) Visual stock bars */}

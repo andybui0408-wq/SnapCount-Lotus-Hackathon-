@@ -27,6 +27,11 @@ export function savePrices(prices: ProductPrice[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify([...merged.values()]));
 }
 
+export function removePrice(productName: string): void {
+  const prices = getPrices().filter(p => p.name.toLowerCase() !== productName.toLowerCase());
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(prices));
+}
+
 export function getPrefilledPrice(
   productName: string,
   geminiEstimate: number,
