@@ -1508,6 +1508,15 @@ body {
   stroke: var(--charcoal);
 }
 
+.catalog-product-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
 .catalog-product-name {
   flex: 1;
   font-size: 14px;
@@ -1846,6 +1855,26 @@ body {
   letter-spacing: 1.5px;
   color: var(--stone);
   margin-top: 2px;
+}
+
+.home-critical-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--off-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.home-critical-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.home-critical-count {
+  font-size: 12px;
+  color: var(--charcoal);
 }
 
 /* ── PROFILE PAGE ─────────────────────────────────────────────── */
@@ -2295,6 +2324,17 @@ body {
   gap: 2px;
 }
 
+.pc-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pc-confirm-all-btn {
+  font-size: 12px !important;
+  padding: 4px 10px !important;
+}
+
 .pc-title {
   font-family: var(--font-display);
   font-size: 16px;
@@ -2323,12 +2363,46 @@ body {
   border-radius: var(--radius-md);
 }
 
+.pc-card-confirmed {
+  border-color: var(--charcoal);
+}
+
 .pc-card-removed {
   opacity: 0.4;
 }
 
 .pc-card-removed .pc-name {
   text-decoration: line-through;
+}
+
+/* Confirm checkbox */
+.pc-check {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  padding: 0;
+  color: var(--white);
+  flex-shrink: 0;
+}
+
+.pc-check:hover { border-color: var(--charcoal); }
+
+.pc-check-on {
+  background: var(--black);
+  border-color: var(--black);
+}
+
+.pc-check:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .pc-crop {

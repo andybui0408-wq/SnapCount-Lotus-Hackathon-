@@ -11,7 +11,7 @@ interface Props {
 export default function EmailReportButton({ disabled }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY) || "");
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   const generateReport = () => {
@@ -22,32 +22,26 @@ export default function EmailReportButton({ disabled }: Props) {
     return { html: generateInventoryReportHTML(trends.datasets, depletion, dateStr), dateStr };
   };
 
-  const handleSendViaMailApp = () => {
+  const handleSend = async () => {
     if (!email.trim()) return;
+    setStatus("sending");
 
     try {
       localStorage.setItem(EMAIL_KEY, email.trim());
       const { html, dateStr } = generateReport();
 
-      // Build a plain-text summary from depletion data for the mailto body
-      const depletion = getDepletionData();
-      const lines = depletion.map(
-        (d) => `${d.name}: ${d.currentStock} left (${d.daysLeft >= 999 ? "stable" : `~${d.daysLeft.toFixed(0)} days`}) [${d.status.toUpperCase()}]`,
-      );
-      const body = `COUNTR. Inventory Report — ${dateStr}\n\n${lines.join("\n")}\n\n(Full HTML report attached or view below)`;
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: email.trim(),
+          subject: `COUNTR. Inventory Report — ${dateStr}`,
+          html,
+        }),
+      });
 
-      const subject = `COUNTR. Inventory Report — ${dateStr}`;
-      const mailtoUrl = `mailto:${encodeURIComponent(email.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(mailtoUrl, "_blank");
-
-      // Also save full HTML report for download
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `COUNTR-Report-${dateStr.replace(/\//g, "-")}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send");
 
       setStatus("success");
       setTimeout(() => {
@@ -56,7 +50,7 @@ export default function EmailReportButton({ disabled }: Props) {
       }, 2000);
     } catch (err) {
       setStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "Failed to generate report");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to send email");
     }
   };
 
@@ -103,14 +97,14 @@ export default function EmailReportButton({ disabled }: Props) {
             </div>
             <div className="modal-body">
               <p className="text-secondary" style={{ fontSize: 12 }}>
-                Opens your email app with a summary. Full report downloads as HTML.
+                Send the inventory report directly to your email.
               </p>
               <input
                 type="email"
                 placeholder="Recipient email..."
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendViaMailApp()}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
                 style={{
                   width: "100%",
                   background: "var(--white)",
@@ -124,7 +118,7 @@ export default function EmailReportButton({ disabled }: Props) {
               />
 
               {status === "success" && (
-                <div className="success-box">Report ready!</div>
+                <div className="success-box">Report sent!</div>
               )}
               {status === "error" && (
                 <div className="error-box">{errorMsg}</div>
@@ -132,10 +126,10 @@ export default function EmailReportButton({ disabled }: Props) {
 
               <button
                 className="btn btn-primary btn-large"
-                onClick={handleSendViaMailApp}
-                disabled={!email.trim()}
+                onClick={handleSend}
+                disabled={!email.trim() || status === "sending"}
               >
-                Open Mail App
+                {status === "sending" ? "Sending..." : "Send Email"}
               </button>
               <button
                 className="btn btn-ghost"

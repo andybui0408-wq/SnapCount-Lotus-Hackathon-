@@ -6,6 +6,7 @@ const CATALOG_KEY = "countr_catalog";
 export interface CatalogProduct {
   name: string;
   embedding: number[];
+  cropDataUrl?: string;
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -29,9 +30,25 @@ function saveCatalog(catalog: CatalogProduct[]): void {
 
 export async function addToCatalog(name: string, imageBlob: Blob): Promise<void> {
   const embedding = await getEmbedding(imageBlob);
+  // Store crop as data URL for catalog display
+  const cropDataUrl = await blobToDataUrl(imageBlob);
   const catalog = getCatalog();
-  catalog.push({ name, embedding });
+  // Replace existing entry with same name, or add new
+  const existingIdx = catalog.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+  if (existingIdx >= 0) {
+    catalog[existingIdx] = { name, embedding, cropDataUrl };
+  } else {
+    catalog.push({ name, embedding, cropDataUrl });
+  }
   saveCatalog(catalog);
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function removeFromCatalog(name: string): void {

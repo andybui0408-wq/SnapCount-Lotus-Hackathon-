@@ -1,6 +1,5 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { getScans, getDepletionData } from "../services/scanHistory";
-import AIBriefingCard from "../components/AIBriefingCard";
 import type { TabId } from "../types";
 
 interface Props {
@@ -13,91 +12,13 @@ export default function HomePage({ onTabChange }: Props) {
 
   const criticalCount = depletion.filter((d) => d.status === "critical").length;
   const totalItems = depletion.reduce((sum, d) => sum + d.currentStock, 0);
-  const minDays = depletion.length > 0
-    ? Math.min(...depletion.map((d) => d.daysLeft === 999 ? 99 : d.daysLeft))
-    : 0;
-
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const filteredScans = useMemo(() => {
-    if (!searchQuery.trim()) return scans;
-    const q = searchQuery.toLowerCase();
-    return scans.filter((s) =>
-      s.items.some((item) => item.name.toLowerCase().includes(q))
-    );
-  }, [scans, searchQuery]);
-
-  const displayScans = filteredScans.length > 0 ? filteredScans : scans;
+  const criticalItems = depletion.filter((d) => d.status === "critical");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)", overflow: "hidden" }}>
-      {/* Search bar */}
-      <div className="home-search">
-        <input
-          type="text"
-          className="home-search-input"
-          placeholder="Search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-
-      {/* AI Briefing */}
-      <div style={{ padding: "0 20px" }}>
-        <AIBriefingCard />
-      </div>
-
-      {/* Previous scans */}
-      <div style={{ overflow: "hidden" }}>
-        <div className="home-section">
-          <div className="home-section-header">
-            <span className="home-section-title">Previous</span>
-            <span className="home-section-arrow">&rarr;</span>
-          </div>
-        </div>
-        <div className="home-scan-scroll">
-          {displayScans.slice(0, 10).map((scan) => {
-            const date = new Date(scan.timestamp);
-            const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-            const itemNames = scan.items.map((i) => i.name).join(", ");
-            return (
-              <div
-                key={scan.id}
-                className="home-scan-card"
-                onClick={() => onTabChange("history")}
-              >
-                {scan.thumbnail ? (
-                  <img
-                    src={`data:image/jpeg;base64,${scan.thumbnail}`}
-                    alt="Scan"
-                    className="home-scan-thumb"
-                  />
-                ) : (
-                  <div className="home-scan-thumb-placeholder">
-                    <img src="/logoshelf.svg" alt="" />
-                  </div>
-                )}
-                <div className="home-scan-info">
-                  <div className="home-scan-date">{dateStr}</div>
-                  <div className="home-scan-title">{scan.total_items} items</div>
-                  <div className="home-scan-summary">{itemNames || "No items detected"}</div>
-                </div>
-              </div>
-            );
-          })}
-          {scans.length === 0 && (
-            <div className="home-scan-card" onClick={() => onTabChange("scan")}>
-              <div className="home-scan-thumb-placeholder">
-                <img src="/logoshelf.svg" alt="" />
-              </div>
-              <div className="home-scan-info">
-                <div className="home-scan-date">Get started</div>
-                <div className="home-scan-title">No scans yet</div>
-                <div className="home-scan-summary">Tap to start scanning inventory</div>
-              </div>
-            </div>
-          )}
-        </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)", overflow: "hidden", padding: "0 20px" }}>
+      {/* Brand header */}
+      <div style={{ paddingTop: "var(--space-xl)" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>COUNTR.</h1>
       </div>
 
       {/* Tools */}
@@ -143,21 +64,51 @@ export default function HomePage({ onTabChange }: Props) {
         </div>
       </div>
 
-      {/* Quick stats */}
+      {/* Stats in Vietnamese */}
       <div className="home-stats">
         <div className="home-stat">
           <div className="home-stat-number">{criticalCount}</div>
-          <div className="home-stat-label">Critical Items</div>
+          <div className="home-stat-label">San pham can nhap</div>
         </div>
         <div className="home-stat">
           <div className="home-stat-number">{totalItems}</div>
-          <div className="home-stat-label">Total Items</div>
-        </div>
-        <div className="home-stat">
-          <div className="home-stat-number">{minDays > 90 ? "—" : `${Math.round(minDays)}d`}</div>
-          <div className="home-stat-label">Until Restock</div>
+          <div className="home-stat-label">Tong san pham</div>
         </div>
       </div>
+
+      {/* Critical items list */}
+      {criticalItems.length > 0 && (
+        <div>
+          <div className="home-section">
+            <div className="home-section-header">
+              <span className="home-section-title">San pham sap het</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {criticalItems.map((item) => (
+              <div key={item.name} className="home-critical-item">
+                <span className="home-critical-name">{item.name}</span>
+                <span className="home-critical-count mono">{item.currentStock} con lai</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent scans summary */}
+      {scans.length > 0 && (
+        <div>
+          <div className="home-section">
+            <div className="home-section-header">
+              <span className="home-section-title">Quet gan day</span>
+              <span className="home-section-arrow" onClick={() => onTabChange("history")} style={{ cursor: "pointer" }}>&rarr;</span>
+            </div>
+          </div>
+          <p className="text-secondary" style={{ fontSize: 13 }}>
+            {scans.length} lan quet · Lan cuoi: {new Date(scans[0].timestamp).toLocaleDateString("vi-VN")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

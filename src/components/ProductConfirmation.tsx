@@ -139,9 +139,9 @@ export default function ProductConfirmation({
     saveCustomVocabulary(names);
     reloadVocabulary();
 
-    // Step 3: Build DINOv2 catalog for new products with crops
-    const newWithCrops = confirmed.filter(p => p.isNew && p.cropBlob);
-    for (const product of newWithCrops) {
+    // Step 3: Build DINOv2 catalog for ALL confirmed products with crops
+    const withCrops = confirmed.filter(p => p.cropBlob);
+    for (const product of withCrops) {
       try {
         await addToCatalog(product.editedName, product.cropBlob!);
       } catch (e) {
@@ -162,126 +162,158 @@ export default function ProductConfirmation({
     );
   }
 
-  const hasNewProducts = products.some(p => p.isNew);
+  const pendingCount = products.filter(p => p.status === "pending").length;
+
+  const confirmAll = () => {
+    setProducts(prev =>
+      prev.map(p => p.status === "pending" ? { ...p, status: "confirmed" as const } : p)
+    );
+  };
 
   return (
     <div className="product-confirm">
       <div className="pc-header">
-        <span className="pc-title">
-          {hasNewProducts ? "Confirm Your Products" : "Products Found"}
-        </span>
+        <div className="pc-header-row">
+          <span className="pc-title">Confirm Products</span>
+          {pendingCount > 0 && (
+            <button className="btn btn-ghost pc-confirm-all-btn" onClick={confirmAll}>
+              Confirm All
+            </button>
+          )}
+        </div>
         <span className="pc-subtitle">
-          {hasNewProducts
-            ? "Review what we found. Fix any mistakes."
-            : "All products recognized from your store."}
+          Tap the circle to confirm each product, then save.
         </span>
       </div>
 
       <div className="pc-list">
-        {products.map((product) => (
-          <div
-            key={product.id}
-            className={`pc-card ${product.status === "removed" ? "pc-card-removed" : ""}`}
-          >
-            {/* Crop thumbnail */}
-            <div className="pc-crop">
-              {product.cropDataUrl ? (
-                <img src={product.cropDataUrl} alt={product.editedName} />
-              ) : (
-                <div className="pc-crop-placeholder" />
-              )}
-            </div>
+        {products.map((product) => {
+          const isConfirmed = product.status === "confirmed" || product.status === "edited";
+          const isRemoved = product.status === "removed";
 
-            {/* Product info */}
-            <div className="pc-info">
-              {editingId === product.id ? (
-                <input
-                  className="pc-name-input"
-                  type="text"
-                  value={product.editedName}
-                  autoFocus
-                  onChange={(e) =>
-                    updateProduct(product.id, { editedName: e.target.value })
-                  }
-                  onBlur={() => {
-                    setEditingId(null);
-                    if (product.editedName !== product.detectedName) {
-                      updateProduct(product.id, { status: "edited" });
+          return (
+            <div
+              key={product.id}
+              className={`pc-card ${isRemoved ? "pc-card-removed" : ""} ${isConfirmed ? "pc-card-confirmed" : ""}`}
+            >
+              {/* Confirm checkbox — left side */}
+              <button
+                className={`pc-check ${isConfirmed ? "pc-check-on" : ""}`}
+                onClick={() => {
+                  if (isRemoved) return;
+                  updateProduct(product.id, {
+                    status: isConfirmed ? "pending" : "confirmed",
+                  });
+                }}
+                disabled={isRemoved}
+                title={isConfirmed ? "Unconfirm" : "Confirm product"}
+              >
+                {isConfirmed && (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                )}
+              </button>
+
+              {/* Crop thumbnail */}
+              <div className="pc-crop">
+                {product.cropDataUrl ? (
+                  <img src={product.cropDataUrl} alt={product.editedName} />
+                ) : (
+                  <div className="pc-crop-placeholder" />
+                )}
+              </div>
+
+              {/* Product info */}
+              <div className="pc-info">
+                {editingId === product.id ? (
+                  <input
+                    className="pc-name-input"
+                    type="text"
+                    value={product.editedName}
+                    autoFocus
+                    onChange={(e) =>
+                      updateProduct(product.id, { editedName: e.target.value })
                     }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    onBlur={() => {
                       setEditingId(null);
                       if (product.editedName !== product.detectedName) {
                         updateProduct(product.id, { status: "edited" });
                       }
-                    }
-                  }}
-                />
-              ) : (
-                <span className="pc-name">{product.editedName}</span>
-              )}
-
-              <span className="pc-meta">
-                {product.isNew ? "New product" : "In your store"}
-                {product.count > 0 && <> &middot; {product.count} found</>}
-              </span>
-
-              {/* Price input */}
-              {product.status !== "removed" && (
-                <div className="pc-price-row">
-                  <input
-                    type="number"
-                    className="pc-price-input"
-                    step="1000"
-                    min="0"
-                    value={product.editedPrice || ""}
-                    onChange={(e) =>
-                      updateProduct(product.id, {
-                        editedPrice: parseInt(e.target.value) || 0,
-                      })
-                    }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setEditingId(null);
+                        if (product.editedName !== product.detectedName) {
+                          updateProduct(product.id, { status: "edited" });
+                        }
+                      }
+                    }}
                   />
-                  <span className="pc-price-suffix">d</span>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <span className="pc-name">{product.editedName}</span>
+                )}
 
-            {/* Action buttons */}
-            <div className="pc-actions">
-              {product.status !== "removed" ? (
-                <>
+                <span className="pc-meta">
+                  {product.count > 0 && <>{product.count} found</>}
+                </span>
+
+                {/* Price input */}
+                {!isRemoved && (
+                  <div className="pc-price-row">
+                    <input
+                      type="number"
+                      className="pc-price-input"
+                      step="1000"
+                      min="0"
+                      value={product.editedPrice || ""}
+                      onChange={(e) =>
+                        updateProduct(product.id, {
+                          editedPrice: parseInt(e.target.value) || 0,
+                        })
+                      }
+                    />
+                    <span className="pc-price-suffix">d</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="pc-actions">
+                {!isRemoved ? (
+                  <>
+                    <button
+                      className="pc-action-btn"
+                      onClick={() => setEditingId(product.id)}
+                      title="Edit name"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                      </svg>
+                    </button>
+                    <button
+                      className="pc-action-btn pc-action-remove"
+                      onClick={() => updateProduct(product.id, { status: "removed" })}
+                      title="Remove"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+                      </svg>
+                    </button>
+                  </>
+                ) : (
                   <button
                     className="pc-action-btn"
-                    onClick={() => setEditingId(product.id)}
-                    title="Edit name"
+                    onClick={() => updateProduct(product.id, { status: "pending" })}
+                    title="Undo remove"
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                    </svg>
+                    Undo
                   </button>
-                  <button
-                    className="pc-action-btn pc-action-remove"
-                    onClick={() => updateProduct(product.id, { status: "removed" })}
-                    title="Remove"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
-                    </svg>
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="pc-action-btn"
-                  onClick={() => updateProduct(product.id, { status: "pending" })}
-                  title="Undo remove"
-                >
-                  Undo
-                </button>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button

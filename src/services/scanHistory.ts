@@ -24,6 +24,16 @@ export function clearScans(): void {
   localStorage.removeItem(SCANS_KEY);
 }
 
+export function clearAllData(): void {
+  localStorage.removeItem(SCANS_KEY);
+  localStorage.removeItem(SNAPSHOTS_KEY);
+  localStorage.removeItem(SUPPLIERS_KEY);
+  localStorage.removeItem(SEEDED_KEY);
+  localStorage.removeItem(PRICES_KEY);
+  localStorage.removeItem("countr_catalog");
+  localStorage.removeItem("countr_vocabulary");
+}
+
 export function getSnapshots(): InventorySnapshot[] {
   const raw = localStorage.getItem(SNAPSHOTS_KEY);
   return raw ? JSON.parse(raw) : [];

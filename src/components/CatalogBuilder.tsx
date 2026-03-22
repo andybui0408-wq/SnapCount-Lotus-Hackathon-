@@ -1,12 +1,13 @@
 import { useState, useRef } from "react";
-import { listCatalogNames, removeFromCatalog, addToCatalog, clearCatalog } from "../services/productCatalog";
+import { getCatalog, removeFromCatalog, addToCatalog, clearCatalog } from "../services/productCatalog";
+import type { CatalogProduct } from "../services/productCatalog";
 
 interface Props {
   onClose: () => void;
 }
 
 export default function CatalogBuilder({ onClose }: Props) {
-  const [products, setProducts] = useState<string[]>(listCatalogNames());
+  const [products, setProducts] = useState<CatalogProduct[]>(() => getCatalog());
   const [name, setName] = useState("");
   const [fileName, setFileName] = useState("");
   const [adding, setAdding] = useState(false);
@@ -20,7 +21,7 @@ export default function CatalogBuilder({ onClose }: Props) {
     setError(null);
     try {
       await addToCatalog(name.trim(), file);
-      setProducts(listCatalogNames());
+      setProducts(getCatalog());
       setName("");
       setFileName("");
       if (fileRef.current) fileRef.current.value = "";
@@ -37,7 +38,7 @@ export default function CatalogBuilder({ onClose }: Props) {
 
   const handleRemove = (productName: string) => {
     removeFromCatalog(productName);
-    setProducts(listCatalogNames());
+    setProducts(getCatalog());
   };
 
   const handleClearAll = () => {
@@ -102,7 +103,7 @@ export default function CatalogBuilder({ onClose }: Props) {
 
           {error && <div className="error-box">{error}</div>}
 
-          {/* Product list */}
+          {/* Product list with crop images */}
           {products.length > 0 ? (
             <>
               <div className="catalog-list-header">
@@ -111,16 +112,24 @@ export default function CatalogBuilder({ onClose }: Props) {
               </div>
               <div className="catalog-product-list">
                 {products.map((p) => (
-                  <div key={p} className="catalog-product-row">
-                    <div className="catalog-product-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                        <line x1="12" y1="22.08" x2="12" y2="12"/>
-                      </svg>
-                    </div>
-                    <span className="catalog-product-name">{p}</span>
-                    <button className="catalog-remove-btn" onClick={() => handleRemove(p)}>
+                  <div key={p.name} className="catalog-product-row">
+                    {p.cropDataUrl ? (
+                      <img
+                        src={p.cropDataUrl}
+                        alt={p.name}
+                        className="catalog-product-thumb"
+                      />
+                    ) : (
+                      <div className="catalog-product-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                          <line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                      </div>
+                    )}
+                    <span className="catalog-product-name">{p.name}</span>
+                    <button className="catalog-remove-btn" onClick={() => handleRemove(p.name)}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18"/>
                         <line x1="6" y1="6" x2="18" y2="18"/>

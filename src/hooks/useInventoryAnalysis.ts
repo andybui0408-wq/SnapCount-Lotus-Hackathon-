@@ -160,7 +160,8 @@ export function useInventoryAnalysis() {
         );
       }
 
-      let predictions = flatToMerged(flatPredictions);
+      const dinoPredictions = flatToMerged(flatPredictions);
+      let predictions = dinoPredictions;
       let items: MergedItem[];
       let depthNotes = "";
 
@@ -182,14 +183,14 @@ export function useInventoryAnalysis() {
         items = mergeConsensus(geminiResult, consensus);
         depthNotes = geminiResult?.depth_notes || "";
 
-        // Fallback: if DINO found nothing on frame 0, use Gemini's boxes
-        if (perFrameFlat[0].length === 0 && geminiResult?.products) {
-          console.log("[COUNTR] DINO empty — using Gemini consensus boxes as fallback");
+        // Always prefer Gemini boxes — they match the items Gemini identified
+        if (geminiResult?.products) {
           const gBoxes = geminiResult.products.map(p => ({
             product: p.name,
-            boxes: (p as unknown as { boxes?: number[][] }).boxes,
+            boxes: p.boxes,
           }));
           const geminiPreds = geminiBoxesToPredictions(gBoxes, imgDims.width, imgDims.height);
+          console.log("[COUNTR] Gemini consensus boxes: %d (DINO had %d)", geminiPreds.length, dinoPredictions.length);
           if (geminiPreds.length > 0) {
             predictions = geminiPreds;
           }
@@ -200,28 +201,37 @@ export function useInventoryAnalysis() {
 
         const detectionContext = formatDetectionResults(flatPredictions);
         const geminiResult = await analyzeSinglePhoto(photos[0], detectionContext).catch(() => null);
-        items = mergeSinglePhoto(predictions, geminiResult);
+        items = mergeSinglePhoto(dinoPredictions, geminiResult);
         depthNotes = geminiResult?.note || "";
 
-        // Fallback: if DINO found nothing, use Gemini's bounding boxes
-        if (predictions.length === 0 && geminiResult?.products) {
-          console.log("[COUNTR] DINO empty — using Gemini boxes as fallback");
-          predictions = geminiBoxesToPredictions(geminiResult.products, imgDims.width, imgDims.height);
-          perFrameFlat[0] = []; // keep consistent
+        // Always prefer Gemini boxes — they match the identified products
+        if (geminiResult?.products) {
+          const geminiPreds = geminiBoxesToPredictions(geminiResult.products, imgDims.width, imgDims.height);
+          console.log("[COUNTR] Gemini single-photo boxes: %d (DINO had %d)", geminiPreds.length, dinoPredictions.length);
+          if (geminiPreds.length > 0) {
+            predictions = geminiPreds;
+          }
         }
       }
 
-      // Per-frame annotations
+      // Per-frame annotations — each frame gets its own DINO boxes
+      // Frame 0: prefer Gemini boxes (product-specific names), others: DINO per-frame
       const angleAnnotations: AngleAnnotation[] = photos.map((_, i) => {
         const dinoPreds = flatToMerged(perFrameFlat[i]);
+        const framePreds = i === 0
+          ? (predictions.length > 0 ? predictions : dinoPreds)
+          : (dinoPreds.length > 0 ? dinoPreds : predictions);
+        console.log("[COUNTR] Frame %d annotations: %d boxes (source: %s)", i, framePreds.length,
+          i === 0 && predictions.length > 0 ? "gemini" : dinoPreds.length > 0 ? "dino" : "fallback");
         return {
-          predictions: dinoPreds.length > 0 ? dinoPreds : predictions,
+          predictions: framePreds,
           imageWidth: allDims[i].width,
           imageHeight: allDims[i].height,
           label: `Frame ${i + 1}`,
         };
       });
 
+      // Main predictions = frame 0's annotations (Gemini preferred)
       predictions = angleAnnotations[0].predictions;
 
       const thumbnail = await makeThumbnail(photos[0]);

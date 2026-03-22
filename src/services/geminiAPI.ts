@@ -17,7 +17,7 @@ export async function callGemini(messages: unknown[]): Promise<string> {
     },
     body: JSON.stringify({
       model: GEMINI_MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages,
     }),
   });

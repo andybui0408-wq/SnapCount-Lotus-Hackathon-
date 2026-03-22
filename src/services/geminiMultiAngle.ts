@@ -49,6 +49,7 @@ export interface ConsensusProduct {
   estimated_price: number;
   ocr_text: string;
   confidence: string;
+  boxes?: number[][];
 }
 
 export interface ConsensusResult {
@@ -96,9 +97,10 @@ Your job:
 5. Check the side-angle photos for additional DEPTH — rows behind the front row that detection might have missed entirely. If you see depth, ADD to the consensus count.
 6. Identify any products visible in the photos that the detector completely missed.
 7. For each product, ESTIMATE the typical Vietnamese retail sell price in VND. Use realistic prices for Ho Chi Minh City 2024-2026. Examples: Coca-Cola can ~10000đ, instant noodle pack ~5000đ, beer can ~15000đ.
-8. For each product, provide bounding boxes on the FIRST photo as [ymin, xmin, ymax, xmax] normalized to 0-1000 scale. One box per visible instance (up to 10 boxes per product).
+8. REQUIRED: For each product, provide bounding boxes on the FIRST photo as [ymin, xmin, ymax, xmax] normalized to 0-1000 scale. Draw ONE box per visible instance (up to 10 boxes per product). Every product MUST have at least one box in the "boxes" array.
 
 IMPORTANT: Start with the consensus count as your baseline. Only adjust UP or DOWN if you have visual evidence from the photos.
+IMPORTANT: The "boxes" field is REQUIRED for every product. Do NOT omit it.
 
 Return ONLY valid JSON, no markdown:
 {
@@ -114,7 +116,7 @@ Return ONLY valid JSON, no markdown:
       "estimated_price": 10000,
       "ocr_text": "Coca-Cola",
       "confidence": "high",
-      "boxes": [[120, 340, 250, 450]]
+      "boxes": [[120, 340, 250, 450], [120, 500, 250, 600]]
     }
   ],
   "total_items": 42,

@@ -18,11 +18,6 @@ export const THUMBNAIL_QUALITY = 0.6;
 // Catalog
 export const CATALOG_SIMILARITY_THRESHOLD = 0.7;
 
-// EmailJS
-export const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "";
-export const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || "";
-export const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "";
-
 // Default vocabulary — generic categories for open detection
 // Specific product names are identified by Gemini after detection
 export const DEFAULT_VOCABULARY: string[] = [
@@ -41,13 +36,13 @@ The detection system identified these products:
 Count only what is VISIBLE in this single photo. Do not estimate hidden items.
 
 For each product:
-- Provide bounding boxes as [ymin, xmin, ymax, xmax] normalized to 0-1000 scale
+- REQUIRED: Provide bounding boxes as [ymin, xmin, ymax, xmax] normalized to 0-1000 scale. Draw ONE box per visible instance (up to 10 per product). Every product MUST have at least one box.
 - ESTIMATE the typical Vietnamese retail sell price in VND (realistic Ho Chi Minh City prices 2024-2026). Examples: Coca-Cola can ~10000đ, instant noodle pack ~5000đ, beer can ~15000đ
 
 Return ONLY valid JSON, no markdown:
 {
   "products": [
-    { "product": "Coca-Cola can", "visible_count": 5, "boxes": [[120, 340, 250, 450]], "estimated_price": 10000, "notes": "" }
+    { "product": "Coca-Cola can", "visible_count": 5, "boxes": [[120, 340, 250, 450], [120, 500, 250, 600]], "estimated_price": 10000, "notes": "" }
   ],
   "total_items": 20,
   "note": "Single angle — take a side photo to see depth"
