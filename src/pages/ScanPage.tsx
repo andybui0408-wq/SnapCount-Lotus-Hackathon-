@@ -18,7 +18,8 @@ export default function ScanPage() {
   const [productsSaved, setProductsSaved] = useState(false);
   const { photos, setPhotos, setLastResult } = useScanContext();
   const { loading, error, result, analyze } = useInventoryAnalysis();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -88,12 +89,26 @@ export default function ScanPage() {
                 <button className="btn btn-ghost" onClick={() => setPhotos([])}>Clear</button>
               </div>
             ) : (
-              <button className="upload-btn" onClick={() => inputRef.current?.click()}>
-                <span className="upload-icon">+</span>
-                <span>Take Photo or Upload</span>
-              </button>
+              <div className="quick-capture-options">
+                <button className="upload-btn" onClick={() => cameraRef.current?.click()}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                  </svg>
+                  <span>Take Photo</span>
+                </button>
+                <button className="upload-btn" onClick={() => uploadRef.current?.click()}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <span>Upload Image</span>
+                </button>
+              </div>
             )}
-            <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={handleFile} hidden />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} hidden />
+            <input ref={uploadRef} type="file" accept="image/*" onChange={handleFile} hidden />
           </div>
 
           <button
